@@ -1,0 +1,27 @@
+# Settings of the relay_tracking Brevo collector: copy to brevo-collector.conf (chmod 600, owned by the user running
+# the collector) and adapt.
+
+# Relay folder, mounted in the Roundcube container under $config['relay_tracking_dir']/brevo
+RELAY_DIR=/srv/roundcube/relays/brevo
+
+# Sender domains whose mail goes out through Brevo (space separated). Events and blocked contacts of other senders
+# on the same Brevo account are left out.
+DOMAINS="example.org"
+
+# Brevo API key (file holding only the key, chmod 600, outside any Git repository).
+# Needed: transactional statistics + blocked contacts (read).
+API_KEY_FILE=/root/.config/brevo/api_key
+
+# Key allowed to UNBLOCK (DELETE /smtp/blockedContacts); the same one by default. Missing file = no unblocking from
+# Roundcube (the "Unblock" button goes away).
+#UNBLOCK_KEY_FILE=/root/.config/brevo/unblock_key
+
+# Roundcube web server user (owner of requests/): 33 = www-data in the official image
+#WEB_UID=33
+
+# Lock and unblock log (root 700)
+#STATE_DIR=/var/lib/relay-tracking-brevo
+
+# Event window (days, 90 max at Brevo) and publication delay shown in Roundcube
+#EVENT_DAYS=90
+#LAG="up to 1-2 h"

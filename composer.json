@@ -1,0 +1,28 @@
+{
+    "name": "p6g9yhk6/relay_tracking",
+    "type": "roundcube-plugin",
+    "description": "Per recipient delivery tracking of sent mail (delivered, opened, clicked, bounced, spam, unsubscribed) and blocked contacts management for mail sent through a transactional SMTP relay such as Brevo. Roundcube holds no relay key: a server-side collector feeds it.",
+    "keywords": ["roundcube", "plugin", "tracking", "delivery", "bounce", "brevo", "smtp relay", "blocked contacts"],
+    "homepage": "https://github.com/P6g9YHK6/roundcube-relay_tracking",
+    "license": "GPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "P6g9YHK6",
+            "homepage": "https://github.com/P6g9YHK6",
+            "role": "Maintainer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/P6g9YHK6/roundcube-relay_tracking/issues",
+        "source": "https://github.com/P6g9YHK6/roundcube-relay_tracking"
+    },
+    "require": {
+        "php": ">=7.3.0",
+        "roundcube/plugin-installer": ">=0.1.6"
+    },
+    "extra": {
+        "roundcube": {
+            "min-version": "1.6.0"
+        }
+    }
+}

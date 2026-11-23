@@ -1,0 +1,16 @@
+<?php
+
+// relay_tracking: copy to config.inc.php in this folder, or set these in Roundcube's main config.
+
+// Folder the relay collectors write to (one subfolder per relay). Roundcube needs read access to it and write
+// access to <relay>/requests/ (unblock requests).
+$config['relay_tracking_dir'] = '/var/roundcube/relays';
+
+// Seconds without any event after which a sent mail is labelled "no tracking" (sent before the relay was in use or
+// through another relay). Before that it shows "pending", since relays publish their events with a delay.
+$config['relay_tracking_untracked_after'] = 86400;
+
+// Blocked contacts are listed, alerted on and unblockable only for the contacts blocked while sending from one of the
+// user's identities (or when the relay does not say who sent). true = every user of a relay's domains sees and can
+// unblock all of that relay's blocked contacts (single user or trusted team).
+$config['relay_tracking_show_all_blocked'] = false;
