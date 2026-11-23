@@ -1,29 +1,5 @@
 <?php
-// relay_tracking: français. Variables : $relay (nom du relais), $email, $reason, $date, $n, $t, $days, $lag, $domains.
-$labels['blocked'] = 'Contacts bloqués';
-$labels['blocked_title'] = 'Contacts bloqués par les relais d’envoi';
-$labels['blocked_hint'] = 'Les mails envoyés depuis $domains (relais $relay) ne partent plus vers ces adresses, sans message d’erreur. Un contact privé qui s’est désinscrit l’a souvent fait par erreur : « Débloquer » le rétablit dans la minute.';
-$labels['no_blocked_list'] = 'Le relais $relay ne fournit pas de liste de contacts bloqués.';
-$labels['blocked_none'] = 'Aucun contact bloqué.';
-$labels['col_email'] = 'Adresse';
-$labels['col_reason'] = 'Motif';
-$labels['col_since'] = 'Depuis le';
-$labels['unblock'] = 'Débloquer';
-$labels['unblock_confirm'] = 'Débloquer $email chez $relay ? Les prochains mails lui seront de nouveau délivrés.';
-$labels['pending'] = 'Déblocage en cours…';
-$labels['history'] = 'Derniers déblocages';
-$labels['updated'] = 'Liste mise à jour par le serveur chaque minute (dernière : $date).';
-$labels['st_unblocked'] = 'Débloqué';
-$labels['st_not_blocked'] = 'Plus bloqué';
-$labels['st_invalid'] = 'Adresse invalide';
-$labels['st_dry_run'] = 'Simulation';
-$labels['st_error'] = 'Échec du déblocage';
-$labels['reason_unsubscribed'] = 'Désinscrit';
-$labels['reason_hard_bounce'] = 'Adresse en échec définitif';
-$labels['reason_spam'] = 'A signalé un mail comme spam';
-$labels['reason_manual'] = 'Bloqué manuellement';
-$labels['reason_invalid'] = 'Adresse invalide';
-$labels['reason_other'] = 'Bloqué';
+// relay_tracking: français. Variables : $relay (nom du relais), $n, $t, $days, $lag, $ip.
 $labels['track'] = 'Suivi d’envoi · $relay';
 $labels['waiting'] = 'Suivi en attente : $relay n’a encore rien publié pour ce mail.';
 $labels['waiting_lag'] = '(délai habituel : $lag)';
@@ -45,10 +21,7 @@ $labels['ev_blocked'] = 'Non envoyé : contact bloqué';
 $labels['ev_deferred'] = 'Différé';
 $labels['ev_invalid'] = 'Adresse invalide';
 $labels['ev_error'] = 'Erreur d’envoi';
-$labels['resolved'] = 'débloqué le $date';
 $labels['ev_none'] = 'Aucun événement';
 $labels['auto_open'] = 'ouverture probablement automatique (le fournisseur du destinataire, ex. Proton ou Apple, charge les images à la réception) : seuls les clics prouvent une lecture.';
-$labels['is_blocked'] = 'Bloqué chez $relay : $reason (depuis le $date). Les prochains mails ne lui seront pas délivrés.';
-$labels['compose_blocked'] = '$email est bloqué chez $relay ($reason, depuis le $date) : ce mail ne lui sera pas délivré.';
-$labels['alert'] = '$n contact(s) bloqué(s) par un relais d’envoi : $emails. Voir Paramètres → Contacts bloqués.';
-$messages['unblock_failed'] = 'La demande de déblocage n’a pas pu être enregistrée.';
+$labels['ev_clicked'] = 'Clic';
+$labels['ip'] = 'IP : $ip';

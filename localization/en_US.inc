@@ -1,29 +1,5 @@
 <?php
-// relay_tracking: English. Variables: $relay (relay name), $email, $reason, $date, $n, $t, $days, $lag, $domains.
-$labels['blocked'] = 'Blocked contacts';
-$labels['blocked_title'] = 'Contacts blocked by sending relays';
-$labels['blocked_hint'] = 'Mail sent from $domains ($relay relay) is no longer delivered to these addresses, without any error. A private contact who unsubscribed often did so by mistake: “Unblock” restores them within a minute.';
-$labels['no_blocked_list'] = 'The $relay relay does not provide a blocked contacts list.';
-$labels['blocked_none'] = 'No blocked contacts.';
-$labels['col_email'] = 'Address';
-$labels['col_reason'] = 'Reason';
-$labels['col_since'] = 'Since';
-$labels['unblock'] = 'Unblock';
-$labels['unblock_confirm'] = 'Unblock $email at $relay? Future mail will be delivered again.';
-$labels['pending'] = 'Unblocking…';
-$labels['history'] = 'Recent unblocks';
-$labels['updated'] = 'List refreshed by the server every minute (last: $date).';
-$labels['st_unblocked'] = 'Unblocked';
-$labels['st_not_blocked'] = 'No longer blocked';
-$labels['st_invalid'] = 'Invalid address';
-$labels['st_dry_run'] = 'Dry run';
-$labels['st_error'] = 'Unblock failed';
-$labels['reason_unsubscribed'] = 'Unsubscribed';
-$labels['reason_hard_bounce'] = 'Hard bounce';
-$labels['reason_spam'] = 'Reported a mail as spam';
-$labels['reason_manual'] = 'Blocked manually';
-$labels['reason_invalid'] = 'Invalid address';
-$labels['reason_other'] = 'Blocked';
+// relay_tracking: English. Variables: $relay (relay name), $n, $t, $days, $lag, $ip.
 $labels['track'] = 'Delivery tracking · $relay';
 $labels['waiting'] = 'Tracking pending: $relay has not published anything for this mail yet.';
 $labels['waiting_lag'] = '(usual delay: $lag)';
@@ -45,10 +21,7 @@ $labels['ev_blocked'] = 'Not sent: contact blocked';
 $labels['ev_deferred'] = 'Deferred';
 $labels['ev_invalid'] = 'Invalid address';
 $labels['ev_error'] = 'Sending error';
-$labels['resolved'] = 'unblocked on $date';
 $labels['ev_none'] = 'No events';
 $labels['auto_open'] = 'probably an automatic open (the recipient’s provider, e.g. Proton or Apple, loads images on receipt): only clicks prove a read.';
-$labels['is_blocked'] = 'Blocked by $relay: $reason (since $date). Future mail will not be delivered.';
-$labels['compose_blocked'] = '$email is blocked by $relay ($reason, since $date): this mail will not be delivered to them.';
-$labels['alert'] = '$n contact(s) blocked by a sending relay: $emails. See Settings → Blocked contacts.';
-$messages['unblock_failed'] = 'The unblock request could not be saved.';
+$labels['ev_clicked'] = 'Clicked';
+$labels['ip'] = 'IP: $ip';

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.0 (2026-11-23)
+
+Delivery tracking only.
+
+- Removed the blocked contacts features (Settings page, Unblock button, compose warning, new block alert), the unblock
+  actions and the `relay_tracking_show_all_blocked` option. The common format drops `blocked.json`, `unblock.json` and
+  `requests/`; Roundcube now only reads the relays folder.
+- Every open and click listed on its own, in date order; automatic opens marked apart from real opens.
+- Optional IP address per event, shown on hover (`INCLUDE_IP=1` in the Brevo collector, off by default).
+- The Brevo collector only fetches events and is meant to run every 5 minutes; it no longer needs a second key.
+- Stylesheet moved to `skins/elastic/`, license headers added, requires `roundcube/plugin-installer` ~0.3.5.
+
 ## 1.0.0 (2026-11-23)
 
 First public release, extracted from a private Roundcube setup.
