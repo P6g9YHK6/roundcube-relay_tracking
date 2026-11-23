@@ -1,4 +1,5 @@
 # relay_tracking: sending relay tracking for Roundcube
+<img width="554" height="307" alt="image" src="https://github.com/user-attachments/assets/b0a19179-ca8c-49d8-9dba-f863e47f21fa" />
 
 Roundcube plugin (1.6+, Elastic skin or derived) for people who send their mail through a **transactional SMTP relay**
 (Brevo, ...):
