@@ -7,8 +7,6 @@ recipient, whether it was delivered, opened, clicked, bounced, reported as spam 
 
 ![The same box in dark mode on a mail with problems: a hard bounce with its reason and a blocked contact](docs/screenshot-problems-dark.png)
 
-<sub>Screenshots with demo data: example.* addresses and IPs from the documentation ranges.</sub>
-
 ## Features
 
 - **Delivery tracking box** above every sent mail: summary for all recipients, opened automatically on a problem.
