@@ -47,17 +47,31 @@ Or by hand: copy this repository to `plugins/relay_tracking` and add it to the p
 $config['plugins'][] = 'relay_tracking';
 ```
 
-### 2. Shared folder
+### 2. Folders
 
-Pick a folder for the collector's output and make it readable by Roundcube. With Docker, mount it (read-only is
-enough):
+Keep everything under one folder, with the collector (key, config, state) out of Roundcube's reach:
+
+```
+/srv/relay-tracking/
+  collector/   root only: script, config, state (caches, location data)
+  data/        collector output, read by Roundcube
+  plugin/      the plugin, if Roundcube runs in a container and loads it from a mount
+```
+
+```sh
+install -d -m 755 /srv/relay-tracking /srv/relay-tracking/data
+install -d -m 700 /srv/relay-tracking/collector
+```
+
+With Docker, mount `data/` (and `plugin/` if used) read-only:
 
 ```yaml
 volumes:
-  - /srv/roundcube/relays:/var/roundcube/relays:ro
+  - /srv/relay-tracking/data:/var/roundcube/relays:ro
+  - /srv/relay-tracking/plugin:/var/www/html/plugins/relay_tracking:ro
 ```
 
-Then tell the plugin where it is (default `/var/roundcube/relays`):
+Then tell the plugin where the data is (default `/var/roundcube/relays`):
 
 ```php
 $config['relay_tracking_dir'] = '/var/roundcube/relays';
@@ -68,21 +82,29 @@ $config['relay_tracking_dir'] = '/var/roundcube/relays';
 On the server, as root:
 
 ```sh
-install -d -m 700 /opt/relay-tracking /root/.config/brevo
-cp collectors/brevo/brevo-collector.sh /opt/relay-tracking/
-cp collectors/brevo/brevo-collector.conf.example /opt/relay-tracking/brevo-collector.conf
-chmod 600 /opt/relay-tracking/brevo-collector.conf
+C=/srv/relay-tracking/collector
+cp collectors/brevo/brevo-collector.sh $C/
+cp collectors/brevo/brevo-collector.conf.example $C/brevo-collector.conf
+chmod 600 $C/brevo-collector.conf
 
 # the API key, alone in its file (paste it, then Ctrl-D)
-umask 077; cat > /root/.config/brevo/api_key
+umask 077; cat > $C/api_key
 ```
 
-Edit `brevo-collector.conf`: `RELAY_DIR` (the shared folder + `/brevo`), `DOMAINS` (your sender domains),
-`API_KEY_FILE`, and the optional settings below. Try it without writing anything, then schedule it every 5 minutes:
+Edit `brevo-collector.conf`:
 
 ```sh
-DRY_RUN=1 /opt/relay-tracking/brevo-collector.sh
-echo '*/5 * * * * root /opt/relay-tracking/brevo-collector.sh' > /etc/cron.d/relay-tracking
+RELAY_DIR=/srv/relay-tracking/data/brevo
+DOMAINS="example.org"
+API_KEY_FILE=/srv/relay-tracking/collector/api_key
+STATE_DIR=/srv/relay-tracking/collector/state
+```
+
+plus the optional settings below. Try it without writing anything, then schedule it every 5 minutes:
+
+```sh
+DRY_RUN=1 $C/brevo-collector.sh
+echo "*/5 * * * * root $C/brevo-collector.sh" > /etc/cron.d/relay-tracking
 ```
 
 The box appears for users with an identity on one of `DOMAINS`. Brevo publishes events up to 1-2 hours after
@@ -111,7 +133,7 @@ Set in `brevo-collector.conf` (see [the example](collectors/brevo/brevo-collecto
 
 | Setting | Default | |
 |---|---|---|
-| `RELAY_DIR` | required | output folder, e.g. `/srv/roundcube/relays/brevo` |
+| `RELAY_DIR` | required | output folder, e.g. `/srv/relay-tracking/data/brevo` |
 | `DOMAINS` | required | sender domains going through Brevo, space separated; other senders on the account are ignored |
 | `API_KEY_FILE` | required | file holding only the API key (`chmod 600`) |
 | `INCLUDE_IP` | `0` | `1` keeps the IP of each event |
@@ -121,7 +143,7 @@ Set in `brevo-collector.conf` (see [the example](collectors/brevo/brevo-collecto
 | `GEO_URL` | this repo's `geoip` branch | where the location data is downloaded from |
 | `EVENT_DAYS` | `90` | days of events kept (Brevo's maximum) |
 | `LAG` | `up to 1-2 h` | publication delay shown while a mail is pending |
-| `STATE_DIR` | `/var/lib/relay-tracking-brevo` | lock and lookup caches |
+| `STATE_DIR` | `/var/lib/relay-tracking-brevo` | lock, lookup caches and location data; keep it on persistent storage |
 
 The config file is sourced as shell: it must belong to the user running the collector and not be writable by others,
 or the collector refuses to start.

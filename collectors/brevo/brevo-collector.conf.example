@@ -2,7 +2,7 @@
 # the collector) and adapt.
 
 # Relay folder, mounted (read-only is enough) in the Roundcube container under $config['relay_tracking_dir']/brevo
-RELAY_DIR=/srv/roundcube/relays/brevo
+RELAY_DIR=/srv/relay-tracking/data/brevo
 
 # Sender domains whose mail goes out through Brevo (space separated). Events of other senders on the same Brevo
 # account are left out.
@@ -10,10 +10,10 @@ DOMAINS="example.org"
 
 # Brevo API key (file holding only the key, chmod 600, outside any Git repository).
 # Needed: transactional statistics (read).
-API_KEY_FILE=/root/.config/brevo/api_key
+API_KEY_FILE=/srv/relay-tracking/collector/api_key
 
-# Lock folder (root 700)
-#STATE_DIR=/var/lib/relay-tracking-brevo
+# Lock, IP lookup caches and location data (root 700); keep it on persistent storage
+STATE_DIR=/srv/relay-tracking/collector/state
 
 # Keep the IP address of each event (open, click, delivery...), shown on hover in Roundcube. These are the
 # recipients' IPs (or their provider's proxy): personal data, so off by default.
