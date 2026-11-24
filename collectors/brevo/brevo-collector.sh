@@ -205,7 +205,8 @@ if [ "$EV_OK" = "1" ] && [ "$INCLUDE_IP" = "1" ] && { [ "$IP_LOOKUP" = "1" ] || 
     GEO_VER=$(geo_update)
     GCACHE="$STATE_DIR/ipgeo.tsv"; [ -f "$GCACHE" ] || : > "$GCACHE"
     if [ -n "$GEO_VER" ]; then
-      awk -F'\t' -v ver="$GEO_VER" 'NR == FNR { if ($2 == ver) c[$1] = 1; next } !($1 in c)' "$GCACHE" "$WORK/ips" \
+      # (FILENAME, not NR == FNR: the cache is empty on the first run)
+      awk -F'\t' -v ver="$GEO_VER" 'FILENAME == ARGV[1] { if ($2 == ver) c[$1] = 1; next } !($1 in c)' "$GCACHE" "$WORK/ips" \
         | awk "$ip_key_awk"' { print ipkey($1) "\t" $1 }' | LC_ALL=C sort -t $'\t' -k1,1 > "$WORK/geo.q"
       if [ -s "$WORK/geo.q" ]; then
         # one pass over the sorted ranges: each query takes the location of the last range starting at or before it
@@ -214,14 +215,14 @@ if [ "$EV_OK" = "1" ] && [ "$INCLUDE_IP" = "1" ] && { [ "$IP_LOOKUP" = "1" ] || 
           { while (i <= n && (K[i] "") < ($1 "")) { print IP[i] "\t" cur; i++ } if (i > n) exit; cur = $2 }
           END { while (i <= n) { print IP[i] "\t" cur; i++ } }' > "$WORK/geo.ids"
         xz -dc "$STATE_DIR/geo/locations.tsv.xz" | awk -F'\t' -v ver="$GEO_VER" '
-          NR == FNR { want[$2] = want[$2] " " $1; next }
+          FILENAME == ARGV[1] { want[$2] = want[$2] " " $1; next }
           ($1 in want) { n = split(want[$1], ips, " "); for (i = 1; i <= n; i++) print ips[i] "\t" ver "\t" $2 "\t" $3 "\t" $4 }' \
           "$WORK/geo.ids" - > "$WORK/geo.new"
       else
         : > "$WORK/geo.new"
       fi
       # cache = this run's IPs: freshly found ones + still valid cached ones
-      awk -F'\t' -v ver="$GEO_VER" 'NR == FNR { ip[$1] = 1; next } FILENAME == ARGV[2] { if ($2 == ver && ($1 in ip)) print; next }
+      awk -F'\t' -v ver="$GEO_VER" 'FILENAME == ARGV[1] { ip[$1] = 1; next } FILENAME == ARGV[2] { if ($2 == ver && ($1 in ip)) print; next }
         ($1 in ip) { print }' "$WORK/ips" "$GCACHE" "$WORK/geo.new" | sort -u -t $'\t' -k1,1 > "$GCACHE.tmp" \
         && mv -f "$GCACHE.tmp" "$GCACHE"
       cut -f1,3- "$GCACHE" > "$WORK/geo.tsv"
