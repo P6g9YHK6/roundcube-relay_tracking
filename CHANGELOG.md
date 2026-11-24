@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.1 (2026-11-24)
+
+- Timeline table spans the full width again (the scrolling moved to a wrapper); time, event and IP take only the room
+  they need.
+- README screenshots with demo data.
+
 ## 2.2.0 (2026-11-24)
 
 - IP location (city, region, country) under each IP in the timeline, from DB-IP's free "IP to City Lite" data: a daily

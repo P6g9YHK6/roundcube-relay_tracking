@@ -1,5 +1,10 @@
 # relay_tracking: sending relay tracking for Roundcube
-<img width="554" height="307" alt="image" src="https://github.com/user-attachments/assets/b0a19179-ca8c-49d8-9dba-f863e47f21fa" />
+
+![Tracking box of a sent mail: stepper per recipient and the timeline of the first one, with IP location and owner](docs/screenshot-tracking.png)
+
+![The same box in dark mode on a mail with problems: a hard bounce with its reason and a blocked contact](docs/screenshot-problems-dark.png)
+
+<sub>Screenshots with demo data: example.* addresses and IPs from the documentation ranges.</sub>
 
 Roundcube plugin (1.6+, Elastic skin or derived) for people who send their mail through a **transactional SMTP relay**
 (Brevo, ...). In a sent mail, a **Delivery tracking** box shows per recipient: sent, delivered, opened, clicks (with

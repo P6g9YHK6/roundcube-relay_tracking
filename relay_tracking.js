@@ -169,7 +169,8 @@
     function timeline(a, hosts) {
         var with_detail = a.rows.some(function (x) { return x.detail; }),
             with_ip = a.rows.some(function (x) { return x.ip; }),
-            table = el('table', 'rt-timeline'), thead = el('thead'), hr = el('tr'), tbody = el('tbody');
+            table = el('table', 'rt-timeline' + (with_detail ? ' rt-has-detail' : '')), thead = el('thead'), hr = el('tr'),
+            tbody = el('tbody');
 
         [['col_time', true], ['col_event', true], ['col_detail', with_detail], ['col_ip', with_ip]].forEach(function (c) {
             if (c[1]) hr.appendChild(el('th', null, label(c[0])));
@@ -195,7 +196,11 @@
             tbody.appendChild(tr);
         });
         table.appendChild(tbody);
-        return table;
+
+        // the wrapper scrolls (a table with display: block would no longer stretch to the full width)
+        var wrap = el('div', 'rt-tl');
+        wrap.appendChild(table);
+        return wrap;
     }
 
     function render_track() {

@@ -217,19 +217,22 @@
 }
 
 /* ---------- timeline: one row per event, scrolls after ~18 rows ---------- */
-#rt-track .rt-timeline {
-    display: block;
+#rt-track .rt-tl {
     max-height: 18rem;
     overflow: auto;
     margin: .7rem 0 .2rem;
     border: 1px solid var(--rt-line);
     border-radius: .4rem;
-    border-collapse: collapse;
-    font-size: .8rem;
 }
 
-#rt-track .rt-timeline[hidden] {
+#rt-track .rt-tl[hidden] {
     display: none;
+}
+
+#rt-track .rt-timeline {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .8rem;
 }
 
 #rt-track .rt-timeline th,
@@ -250,6 +253,18 @@
 
 #rt-track .rt-timeline tbody tr:nth-child(even) {
     background: rgba(127, 127, 127, .05);
+}
+
+/* time, event and IP take what they need, the detail column the rest */
+#rt-track .rt-time,
+#rt-track .rt-ev,
+#rt-track .rt-ip {
+    width: 1%;
+}
+
+/* no detail column: the last one takes the rest */
+#rt-track .rt-timeline:not(.rt-has-detail) td:last-child {
+    width: auto;
 }
 
 #rt-track .rt-time,

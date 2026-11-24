@@ -49,7 +49,7 @@ class relay_tracking extends rcube_plugin
         return [
             'name' => 'relay_tracking',
             'vendor' => 'p6g9yhk6',
-            'version' => '2.2.0',
+            'version' => '2.2.1',
             'license' => 'GPL-3.0-or-later',
             'uri' => 'https://github.com/P6g9YHK6/roundcube-relay_tracking',
         ];
