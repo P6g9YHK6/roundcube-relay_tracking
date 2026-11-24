@@ -49,7 +49,7 @@ class relay_tracking extends rcube_plugin
         return [
             'name' => 'relay_tracking',
             'vendor' => 'p6g9yhk6',
-            'version' => '2.2.1',
+            'version' => '2.2.2',
             'license' => 'GPL-3.0-or-later',
             'uri' => 'https://github.com/P6g9YHK6/roundcube-relay_tracking',
         ];
@@ -227,11 +227,28 @@ class relay_tracking extends rcube_plugin
         $wait = (int) $this->rc->config->get('relay_tracking_untracked_after', 86400);
         $none = empty($per) && empty($all);
         $expired = $none && $h->timestamp && $h->timestamp < $since;
+        // every event date formatted by Roundcube itself: the user's date/time format, "pretty dates" and timezone
+        $dates = [];
+        foreach ($out as $r) {
+            foreach ($r['events'] as $ev) {
+                $iso = (string) ($ev[0] ?? '');
+                if ($iso !== '' && !isset($dates[$iso])) {
+                    try {
+                        $dates[$iso] = $this->rc->format_date(new DateTime($iso));
+                    }
+                    catch (Exception $e) {
+                        // unreadable date: the browser shows it as it came
+                    }
+                }
+            }
+        }
+
         $this->rc->output->set_env('relay_tracking_msg', [
             'name' => $this->relays()[$relay]['name'],
             'lag' => $this->relays()[$relay]['lag'],
             'recipients' => $out,
             'hosts' => (object) $hosts,
+            'dates' => (object) $dates,
             'known' => !$none,
             'expired' => $expired,
             // unknown to the relay long after sending: sent before the relay was in use or through another relay.

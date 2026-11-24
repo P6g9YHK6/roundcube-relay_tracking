@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.2 (2026-11-24)
+
+- Dates follow the user's Roundcube settings (date and time format, pretty dates, timezone): the server formats them
+  with Roundcube's own `format_date()` instead of the browser.
+
 ## 2.2.1 (2026-11-24)
 
 - Timeline table spans the full width again (the scrolling moved to a wrapper); time, event and IP take only the room

@@ -41,9 +41,13 @@
         return e;
     }
 
-    // Short date in the user's language
+    // Date as Roundcube formats it for this user (date/time format, pretty dates, timezone: env "dates", filled
+    // by the PHP side); the browser's short format only if a date is missing there
     function fmt(iso) {
-        var d = new Date(iso);
+        var dates = (rc.env.relay_tracking_msg || {}).dates || {}, d = new Date(iso);
+        if (dates[iso]) {
+            return dates[iso];
+        }
         if (isNaN(d.getTime())) {
             return String(iso);
         }
