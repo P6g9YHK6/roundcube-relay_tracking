@@ -7,7 +7,8 @@
 #
 #  Each run: relay.json (name, domains, capabilities), which is what enables the plugin for those domains, and the
 #  events of the last EVENT_DAYS days (/smtp/statistics/events), grouped by Message-ID then by recipient >
-#  events.json. IP addresses only with INCLUDE_IP=1 (personal data of the recipients: off by default).
+#  events.json. IP addresses only with INCLUDE_IP=1 (personal data of the recipients: off by default); with IP_LOOKUP=1
+#  each IP's reverse DNS name, and with IP_ASN=1 also its network owner (Team Cymru lookup), cached 30 days.
 #
 #  Only mail sent from DOMAINS is kept, so a Brevo account shared with other senders does not leak into Roundcube.
 #
@@ -17,7 +18,7 @@
 #  on exit).
 #  Dry run: DRY_RUN=1 ./brevo-collector.sh > nothing is written outside a temporary folder; output shown with masked
 #  addresses.
-#  Dependencies: bash 4+, curl, jq, flock (util-linux), GNU date.
+#  Dependencies: bash 4+, curl, jq, flock (util-linux), GNU date; dig (bind tools) for IP_LOOKUP.
 #  License: GPL-3.0-or-later.
 # =====================================================================================================================
 set -uo pipefail
@@ -37,7 +38,10 @@ fi
 : "${API_KEY_FILE:?API_KEY_FILE missing}"    # Brevo key (read transactional statistics)
 STATE_DIR="${STATE_DIR:-/var/lib/relay-tracking-brevo}"   # lock
 EVENT_DAYS="${EVENT_DAYS:-90}"                # Brevo API maximum
-INCLUDE_IP="${INCLUDE_IP:-0}"                 # 1 = keep the IP of each event (shown on hover in Roundcube)
+INCLUDE_IP="${INCLUDE_IP:-0}"                 # 1 = keep the IP of each event (shown in the Roundcube timeline)
+IP_LOOKUP="${IP_LOOKUP:-0}"                   # 1 = identify each IP: reverse DNS name (needs INCLUDE_IP=1 and dig)
+IP_ASN="${IP_ASN:-0}"                         # 1 = also look up each IP's network owner at Team Cymru (third party)
+IP_LOOKUPS=200                                # new IP lookups per run at most (cached 30 days)
 [ -n "${LAG:-}" ] || LAG="up to 1-2 h"        # statistics publication delay (shown in Roundcube)
 EV_PAGE=2500
 EV_MAX=25000                                  # events fetched at most per run; "since" tells the plugin where it stopped
@@ -114,8 +118,53 @@ if [ "$EV_OK" = "1" ]; then
                 ( sort_by(.d) | map([.d, .t] + (if .i != "" then [(if .l != "" then .l else .r end), .i]
                                   elif .l != "" then [.l] elif .r != "" then [.r] else [] end)) )})
               | from_entries )})
-        | from_entries )}' "$WORK/ev.all" > "$WORK/events.json" && publish "$WORK/events.json" "$OUT/events.json"
+        | from_entries )}' "$WORK/ev.all" > "$WORK/events.json" && EV_OK=1 || EV_OK=0
 fi
+
+# ------------------------------------------------------------------ IP identification (INCLUDE_IP=1 + IP_LOOKUP=1)
+# "hosts" in events.json: IP > {rdns, provider}. Reverse DNS for every IP; network owner (ASN name) from Team Cymru's
+# DNS service when IP_ASN=1. Cached in STATE_DIR for 30 days, IP_LOOKUPS new lookups per run at most.
+if [ "$EV_OK" = "1" ] && [ "$INCLUDE_IP" = "1" ] && [ "$IP_LOOKUP" = "1" ] && command -v dig >/dev/null; then
+  CACHE="$STATE_DIR/ipinfo.tsv"; [ -f "$CACHE" ] || : > "$CACHE"
+  declare -A INFO
+  while IFS=$'\t' read -r ip ts rd org; do INFO[$ip]="$ts"$'\t'"$rd"$'\t'"$org"; done < "$CACHE"
+  n=0
+  : > "$WORK/hosts.tsv"
+  while read -r ip; do
+    [[ "$ip" =~ ^[0-9a-fA-F.:]+$ ]] || continue
+    entry="${INFO[$ip]:-}"
+    if [ -z "$entry" ] || [ $(( NOW - ${entry%%$'\t'*} )) -gt 2592000 ]; then
+      if [ "$n" -lt "$IP_LOOKUPS" ]; then
+        n=$(( n + 1 ))
+        rd=$(dig +short +time=1 +tries=1 -x "$ip" 2>/dev/null | grep -E '^[A-Za-z0-9.-]+\.$' | head -n 1 | sed 's/\.$//')
+        org=""
+        if [ "$IP_ASN" = "1" ] && [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          rev=$(awk -F. '{print $4"."$3"."$2"."$1}' <<< "$ip")
+          asn=$(dig +short +time=1 +tries=1 "$rev.origin.asn.cymru.com" TXT 2>/dev/null | grep '^"' | head -n 1 | tr -d '"' | cut -d'|' -f1 | tr -cd '0-9')
+          [ -n "$asn" ] && org=$(dig +short +time=1 +tries=1 "AS$asn.asn.cymru.com" TXT 2>/dev/null | grep '^"' | head -n 1 | tr -d '"' \
+            | awk -F'|' '{print $5}' | sed -E 's/^ +//; s/, [A-Z]{2}$//' | tr -cd 'A-Za-z0-9 .,&()-' | head -c 60)
+        fi
+        INFO[$ip]="$NOW"$'\t'"$rd"$'\t'"$org"
+      fi
+    fi
+    entry="${INFO[$ip]:-}"
+    [ -n "$entry" ] && printf '%s\t%s\n' "$ip" "${entry#*$'\t'}" >> "$WORK/hosts.tsv"
+  done < <(jq -r '[.messages[][][] | select(length == 4) | .[3]] | unique | .[]' "$WORK/events.json")
+  # entries not seen for 90 days are dropped
+  for ip in "${!INFO[@]}"; do
+    [ $(( NOW - ${INFO[$ip]%%$'\t'*} )) -lt 7776000 ] && printf '%s\t%s\n' "$ip" "${INFO[$ip]}"
+  done > "$CACHE.tmp" && mv -f "$CACHE.tmp" "$CACHE"
+  # provider: private range, else network owner, else the last two labels of the reverse DNS name
+  jq -R -s 'split("\n") | map(select(. != "") | split("\t")) | map({key: .[0], value: (
+      (.[1] // "") as $rd | (.[2] // "") as $org | {rdns: $rd, provider: (
+        if (.[0] | test("^(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|127\\.|[fF][cdCD])")) then "private network"
+        elif $org != "" then $org
+        elif $rd != "" then ($rd | split(".") | .[-2:] | join("."))
+        else "" end)})}) | from_entries' "$WORK/hosts.tsv" > "$WORK/hosts.json" \
+    && jq --slurpfile h "$WORK/hosts.json" '. + {hosts: $h[0]}' "$WORK/events.json" > "$WORK/events.new" \
+    && mv -f "$WORK/events.new" "$WORK/events.json"
+fi
+[ "$EV_OK" = "1" ] && publish "$WORK/events.json" "$OUT/events.json"
 
 if [ "$DRY" = "1" ]; then
   mask(){ sed -E 's/"([^"@ ]{1})[^"@ ]*@/"\1***@/g'; }

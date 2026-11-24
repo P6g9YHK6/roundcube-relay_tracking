@@ -4,8 +4,11 @@
 Roundcube plugin (1.6+, Elastic skin or derived) for people who send their mail through a **transactional SMTP relay**
 (Brevo, ...). In a sent mail, a **Delivery tracking** box shows per recipient: sent, delivered, opened, clicks (with
 the clicked links), bounce (with the reason), spam complaint, unsubscribe. Temporary failures that were followed by a
-delivery show as retries, automatic opens (image proxies of Apple, Proton, ...) are kept apart from real ones, and every
-open and click is listed on its own, with its IP address on hover when the collector provides it.
+delivery show as retries, and automatic opens (image proxies of Apple, Proton, ...) are kept apart from real ones.
+
+Each recipient gets a progress stepper (Sent > Delivered > Opened > Clicked, with dates and counts, problems in red) and
+a folded **timeline**: one row per event with time, event, detail (clicked link, bounce reason) and, when the
+collector provides them, the IP address with its reverse DNS domain or network owner.
 
 Translations: English, French.
 
@@ -35,6 +38,11 @@ The plugin only shows up for a user who has an **identity on a domain** declared
 |---|---|---|
 | `relay_tracking_dir` | `/var/roundcube/relays` | folder the collectors write to |
 | `relay_tracking_untracked_after` | `86400` | seconds without any event after which a mail is labelled "no tracking" (before that: "pending", relays publish late) |
+| `relay_tracking_show_ip` | `true` | default of the user preference "Show IP addresses" (Settings > Preferences > Displaying Messages > Delivery tracking) |
+| `relay_tracking_show_owner` | `true` | default of the user preference "Show who the IP belongs to" |
+
+The two preferences only change what is shown; the collector decides what is fetched. Add them to
+`$config['dont_override']` to enforce the defaults.
 
 ## Privacy
 
@@ -42,7 +50,9 @@ Open and click tracking is done by the relay (a tracking pixel and rewritten lin
 at the relay if you do not want it. Opens are a weak signal: many providers load images on receipt, so only clicks
 prove a read. By default the common format carries no IP address or user agent, only date, type, clicked link and
 reason. A collector may add the IP of each event when asked to (`INCLUDE_IP=1` for Brevo); it is the recipient's IP
-(or their provider's proxy), so personal data: only turn it on if you have a basis for processing it.
+(or their provider's proxy), so personal data: only turn it on if you have a basis for processing it. Identifying the
+IPs is a separate switch (`IP_LOOKUP=1`: reverse DNS), and the network owner lookup another one (`IP_ASN=1`), which
+sends the IPs to Team Cymru's public DNS service.
 
 ## Common format v1 (contract between collector and plugin)
 
@@ -52,7 +62,7 @@ Folder `<relay_tracking_dir>/<id>/` (`id`: `[a-z0-9_-]{1,32}`). Files written by
 | File | Content |
 |---|---|
 | `relay.json` | `{"format": 1, "id", "name", "domains": [..], "capabilities": [..], "lag": "free text", "events_days": n}` |
-| `events.json` | `{"generated": epoch, "days": n, "since"?: epoch, "messages": {"<Message-ID>": {"recipient": [[ISO 8601 date, type, extra?, ip?], ...]}}}` |
+| `events.json` | `{"generated": epoch, "days": n, "since"?: epoch, "messages": {"<Message-ID>": {"recipient": [[ISO 8601 date, type, extra?, ip?], ...]}}, "hosts"?: {"<ip>": {"rdns", "provider"}}}` |
 
 - **Capabilities** (`capabilities`): `events` (required for the plugin to use the relay), `opens`, `clicks`.
 - **`<Message-ID>` key**: the `Message-ID` header of the mail as Roundcube sent it, angle brackets included. The
@@ -64,7 +74,9 @@ Folder `<relay_tracking_dir>/<id>/` (`id`: `[a-z0-9_-]{1,32}`). Files written by
 - **Event types**: `sent`, `delivered`, `deferred`, `soft_bounce`, `hard_bounce`, `blocked` (not sent: the relay
   blocks that recipient), `invalid`, `error`, `opened`, `proxy_open` (image loaded by a proxy: Apple, Proton...),
   `clicked`, `spam`, `unsubscribed` (any other type is ignored). `extra` = link for `clicked`, reason for a bounce
-  (`""` when there is none but an `ip` follows); `ip` = optional IP address of the event, shown on hover.
+  (`""` when there is none but an `ip` follows); `ip` = optional IP address of the event.
+- **`hosts`** in `events.json` (optional): for the IPs above, `rdns` = reverse DNS name and `provider` = who the IP
+  belongs to (network owner, the reverse DNS domain, or `private network`), shown in the timeline.
 - **Permissions**: relay folder `755`, files `644`.
 
 ## Writing a collector for another relay

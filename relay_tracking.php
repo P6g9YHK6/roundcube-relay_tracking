@@ -37,7 +37,7 @@
  */
 class relay_tracking extends rcube_plugin
 {
-    public $task = 'mail';
+    public $task = 'mail|settings';
 
     private const FORMAT = 1;
 
@@ -49,7 +49,7 @@ class relay_tracking extends rcube_plugin
         return [
             'name' => 'relay_tracking',
             'vendor' => 'p6g9yhk6',
-            'version' => '2.0.0',
+            'version' => '2.1.0',
             'license' => 'GPL-3.0-or-later',
             'uri' => 'https://github.com/P6g9YHK6/roundcube-relay_tracking',
         ];
@@ -58,6 +58,13 @@ class relay_tracking extends rcube_plugin
     public function init()
     {
         $this->rc = rcmail::get_instance();
+
+        // Settings > Preferences > Displaying Messages: what the tracking box shows of the IP addresses
+        if ($this->rc->task == 'settings') {
+            $this->add_hook('preferences_list', [$this, 'preferences_list']);
+            $this->add_hook('preferences_save', [$this, 'preferences_save']);
+            return;
+        }
 
         if ($this->rc->output->type != 'html' || !in_array($this->rc->action, ['show', 'preview'], true)) {
             return;
@@ -177,10 +184,28 @@ class relay_tracking extends rcube_plugin
             $rcpts[strtolower($addr)] = true;
         }
 
+        // user preferences: IP addresses, and who they belong to
+        $show_ip = (bool) $this->rc->config->get('relay_tracking_show_ip', true);
+        $show_owner = $show_ip && (bool) $this->rc->config->get('relay_tracking_show_owner', true);
+
         $out = [];
+        $hosts = [];   // reverse DNS / provider of the IPs this mail's events carry (only those)
         foreach (array_keys($rcpts) as $addr) {
             if (rcube_utils::check_email($addr, false)) {
-                $out[] = ['email' => $addr, 'events' => array_values(array_merge($all, (array) ($per[$addr] ?? [])))];
+                $list = array_values(array_merge($all, (array) ($per[$addr] ?? [])));
+                if (!$show_ip) {
+                    $list = array_map(function ($ev) { return array_slice((array) $ev, 0, 3); }, $list);
+                }
+                foreach ($list as $ev) {
+                    $ip = (string) ($ev[3] ?? '');
+                    if ($show_owner && $ip !== '' && isset($events['hosts'][$ip]) && is_array($events['hosts'][$ip])) {
+                        $hosts[$ip] = [
+                            'rdns' => (string) ($events['hosts'][$ip]['rdns'] ?? ''),
+                            'provider' => (string) ($events['hosts'][$ip]['provider'] ?? ''),
+                        ];
+                    }
+                }
+                $out[] = ['email' => $addr, 'events' => $list];
             }
         }
 
@@ -196,6 +221,7 @@ class relay_tracking extends rcube_plugin
             'name' => $this->relays()[$relay]['name'],
             'lag' => $this->relays()[$relay]['lag'],
             'recipients' => $out,
+            'hosts' => (object) $hosts,
             'known' => !$none,
             'expired' => $expired,
             // unknown to the relay long after sending: sent before the relay was in use or through another relay.
@@ -206,5 +232,54 @@ class relay_tracking extends rcube_plugin
         $this->add_texts('localization/', true);
 
         return $p;
+    }
+
+    // ------------------------------------------------------------------ preferences
+
+    private const PREFS = ['relay_tracking_show_ip', 'relay_tracking_show_owner'];
+
+    /** preferences_list hook: "Delivery tracking" block in Displaying Messages, for users with a tracked relay */
+    public function preferences_list($args)
+    {
+        if ($args['section'] != 'mailview') {
+            return $args;
+        }
+        $this->load_config();
+        if (!$this->relays()) {
+            return $args;
+        }
+        $this->add_texts('localization/');
+        $locked = (array) $this->rc->config->get('dont_override', []);
+        $options = [];
+        foreach (self::PREFS as $pref) {
+            if (in_array($pref, $locked, true)) {
+                continue;
+            }
+            $id = 'rcmfd_' . $pref;
+            $check = new html_checkbox(['name' => '_' . $pref, 'id' => $id, 'value' => 1]);
+            $options[$pref] = [
+                'title' => html::label($id, rcube::Q($this->gettext('pref_' . substr($pref, strlen('relay_tracking_'))))),
+                'content' => $check->show($this->rc->config->get($pref, true) ? 1 : 0),
+            ];
+        }
+        if ($options) {
+            $args['blocks']['relay_tracking'] = ['name' => rcube::Q($this->gettext('pref_block')), 'options' => $options];
+        }
+        return $args;
+    }
+
+    /** preferences_save hook */
+    public function preferences_save($args)
+    {
+        if ($args['section'] != 'mailview') {
+            return $args;
+        }
+        $locked = (array) $this->rc->config->get('dont_override', []);
+        foreach (self::PREFS as $pref) {
+            if (!in_array($pref, $locked, true)) {
+                $args['prefs'][$pref] = !empty(rcube_utils::get_input_value('_' . $pref, rcube_utils::INPUT_POST));
+            }
+        }
+        return $args;
     }
 }

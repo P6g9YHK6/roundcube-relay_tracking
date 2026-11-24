@@ -1,5 +1,5 @@
 <?php
-// relay_tracking: français. Variables : $relay (nom du relais), $n, $t, $days, $lag, $ip.
+// relay_tracking: français. Variables : $relay (nom du relais), $n, $t, $days, $lag, $date.
 $labels['track'] = 'Suivi d’envoi · $relay';
 $labels['waiting'] = 'Suivi en attente : $relay n’a encore rien publié pour ce mail.';
 $labels['waiting_lag'] = '(délai habituel : $lag)';
@@ -24,4 +24,14 @@ $labels['ev_error'] = 'Erreur d’envoi';
 $labels['ev_none'] = 'Aucun événement';
 $labels['auto_open'] = 'ouverture probablement automatique (le fournisseur du destinataire, ex. Proton ou Apple, charge les images à la réception) : seuls les clics prouvent une lecture.';
 $labels['ev_clicked'] = 'Clic';
-$labels['ip'] = 'IP : $ip';
+$labels['col_time'] = 'Date';
+$labels['col_event'] = 'Événement';
+$labels['col_detail'] = 'Détail';
+$labels['col_ip'] = 'IP';
+$labels['timeline'] = 'Historique';
+$labels['on'] = '$date';
+$labels['last'] = 'dernier $date';
+$labels['auto_only'] = 'automatique seulement';
+$labels['pref_block'] = 'Suivi d’envoi';
+$labels['pref_show_ip'] = 'Afficher les adresses IP';
+$labels['pref_show_owner'] = 'Afficher à qui appartient l’IP';

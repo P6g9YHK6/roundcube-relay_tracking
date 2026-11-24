@@ -1,5 +1,5 @@
 <?php
-// relay_tracking: English. Variables: $relay (relay name), $n, $t, $days, $lag, $ip.
+// relay_tracking: English. Variables: $relay (relay name), $n, $t, $days, $lag, $date.
 $labels['track'] = 'Delivery tracking · $relay';
 $labels['waiting'] = 'Tracking pending: $relay has not published anything for this mail yet.';
 $labels['waiting_lag'] = '(usual delay: $lag)';
@@ -24,4 +24,14 @@ $labels['ev_error'] = 'Sending error';
 $labels['ev_none'] = 'No events';
 $labels['auto_open'] = 'probably an automatic open (the recipient’s provider, e.g. Proton or Apple, loads images on receipt): only clicks prove a read.';
 $labels['ev_clicked'] = 'Clicked';
-$labels['ip'] = 'IP: $ip';
+$labels['col_time'] = 'Time';
+$labels['col_event'] = 'Event';
+$labels['col_detail'] = 'Detail';
+$labels['col_ip'] = 'IP';
+$labels['timeline'] = 'Timeline';
+$labels['on'] = '$date';
+$labels['last'] = 'last $date';
+$labels['auto_only'] = 'automatic only';
+$labels['pref_block'] = 'Delivery tracking';
+$labels['pref_show_ip'] = 'Show IP addresses';
+$labels['pref_show_owner'] = 'Show who the IP belongs to';

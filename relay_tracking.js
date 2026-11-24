@@ -75,58 +75,126 @@
     // An open this close to delivery is almost certainly the provider's image proxy (Proton, Apple...), not a reader
     var AUTO_OPEN_MS = 20000;
 
-    // Opens and clicks are kept one by one, in date order (events come sorted from the collector); ev[3] is the IP
-    // when the collector includes it (INCLUDE_IP=1)
+    // Every event becomes one timeline row, in date order (events come sorted from the collector). ev[2] is the link
+    // (click) or reason (bounce), ev[3] the IP when the collector includes it (INCLUDE_IP=1).
+    // Row kinds: ok, auto (automatic open, not a read), retried (temporary failure before a delivery), bad (problem).
     function analyse(events) {
-        var a = { opens: 0, auto_opens: 0, clicks: 0, activity: [], links: {}, problems: [], retried: [] }, delivered_t = 0;
+        var a = { opens: 0, auto_opens: 0, clicks: 0, problems: [], rows: [] }, delivered_t = 0;
 
         events.forEach(function (ev) {
             if (String(ev[1]) === 'delivered' && !a.delivered) {
                 a.delivered = ev[0];
-                a.delivered_ip = ev[3] || '';
                 delivered_t = time(ev[0]);
             }
         });
 
         events.forEach(function (ev) {
-            var t = String(ev[1] || ''), d = ev[0], extra = ev[2] || '', ip = ev[3] || '';
+            var t = String(ev[1] || ''), d = ev[0], row = { d: d, k: t, detail: ev[2] || '', ip: ev[3] || '', kind: 'ok' };
             if (t === 'sent') {
-                if (!a.sent) {
-                    a.sent = d;
-                    a.sent_ip = ip;
-                }
+                a.sent = a.sent || d;
+            }
+            else if (t === 'delivered') {
+                // first one is a.delivered
             }
             else if (t === 'opened' || t === 'proxy_open') {
-                var auto = t === 'proxy_open' || (delivered_t && Math.abs(time(d) - delivered_t) < AUTO_OPEN_MS);
-                a.activity.push({ k: 'opened', d: d, ip: ip, auto: !!auto });
-                if (auto) a.auto_opens++;
-                else a.opens++;
+                row.k = 'opened';
+                if (t === 'proxy_open' || (delivered_t && Math.abs(time(d) - delivered_t) < AUTO_OPEN_MS)) {
+                    row.kind = 'auto';
+                    a.auto_opens++;
+                }
+                else {
+                    a.opens++;
+                    a.first_open = a.first_open || d;
+                    a.last_open = d;
+                }
             }
             else if (t === 'clicked') {
                 a.clicks++;
-                a.activity.push({ k: 'clicked', d: d, ip: ip, link: extra });
-                if (extra) a.links[extra] = (a.links[extra] || 0) + 1;
+                a.first_click = a.first_click || d;
+                a.last_click = d;
             }
             else if (PROBLEMS.indexOf(t) >= 0) {
-                var p = { k: t, d: d, reason: extra, ip: ip };
                 if (delivered_t && TRANSIENT.indexOf(t) >= 0 && time(d) <= delivered_t) {
-                    a.retried.push(p);
+                    row.kind = 'retried';
                 }
                 else {
-                    a.problems.push(p);
+                    row.kind = 'bad';
+                    a.problems.push(row);
                 }
             }
+            else {
+                return;   // unknown type: ignored (common format)
+            }
+            a.rows.push(row);
         });
         return a;
     }
 
-    // Tooltip lines: reason or link, IP, note
-    function tip() {
-        return Array.prototype.filter.call(arguments, function (x) { return !!x; }).join('\n') || null;
+    // Progress of one recipient: Sent > Delivered > Opened > Clicked. A problem before delivery takes the Delivered
+    // step (red); a later one (spam complaint, unsubscribe...) is added as a red step at the end.
+    function stepper(a) {
+        var ol = el('ol', 'rt-stepper'), stop = false, early = !a.delivered && a.problems.length ? a.problems[0] : null;
+
+        function step(state, name, meta, title) {
+            var li = el('li', 'rt-st rt-st-' + state);
+            li.appendChild(el('span', 'rt-dot'));
+            li.appendChild(el('span', 'rt-st-label', name));
+            if (meta) li.appendChild(el('span', 'rt-st-meta', meta));
+            if (title) li.title = title;
+            ol.appendChild(li);
+        }
+
+        function count(n, last) {
+            return (n > 1 ? '×' + n + ' · ' : '') + fill(label(n > 1 ? 'last' : 'on'), { date: fmt(last) });
+        }
+
+        step(a.sent || a.delivered ? 'done' : 'todo', label('ev_sent'), a.sent ? fmt(a.sent) : '');
+        if (early) {
+            step('bad', label('ev_' + early.k), fmt(early.d), early.detail || null);
+            stop = true;
+        }
+        else {
+            step(a.delivered ? 'done' : 'todo', label('ev_delivered'), a.delivered ? fmt(a.delivered) : '');
+        }
+        if (a.opens) step(stop ? 'todo' : 'done', label('ev_opened'), count(a.opens, a.last_open));
+        else if (a.auto_opens) step('auto', label('ev_opened') + ' *', label('auto_only'), label('auto_open'));
+        else step('todo', label('ev_opened'), '');
+        step(a.clicks && !stop ? 'done' : 'todo', label('ev_clicked'), a.clicks ? count(a.clicks, a.last_click) : '');
+        a.problems.forEach(function (p) {
+            if (p !== early) step('bad', label('ev_' + p.k), fmt(p.d), p.detail || null);
+        });
+        return ol;
     }
 
-    function ip_line(ip) {
-        return ip ? fill(label('ip'), { ip: ip }) : '';
+    function timeline(a, hosts) {
+        var with_detail = a.rows.some(function (x) { return x.detail; }),
+            with_ip = a.rows.some(function (x) { return x.ip; }),
+            table = el('table', 'rt-timeline'), thead = el('thead'), hr = el('tr'), tbody = el('tbody');
+
+        [['col_time', true], ['col_event', true], ['col_detail', with_detail], ['col_ip', with_ip]].forEach(function (c) {
+            if (c[1]) hr.appendChild(el('th', null, label(c[0])));
+        });
+        thead.appendChild(hr);
+        table.appendChild(thead);
+
+        a.rows.forEach(function (x) {
+            var tr = el('tr', 'rt-row-' + x.kind), ev = el('td', 'rt-ev', label('ev_' + x.k) + (x.kind === 'auto' ? ' *' : ''));
+            if (x.kind === 'auto') ev.title = label('auto_open');
+            tr.appendChild(el('td', 'rt-time', fmt(x.d)));
+            tr.appendChild(ev);
+            if (with_detail) tr.appendChild(el('td', 'rt-detail', x.detail));
+            if (with_ip) {
+                // IP, then who it belongs to (network owner or reverse DNS domain); full reverse DNS name on hover
+                var td = el('td', 'rt-ip'), h = hosts[x.ip] || {};
+                td.appendChild(el('span', 'rt-ip-addr', x.ip));
+                if (h.provider) td.appendChild(el('span', 'rt-ip-owner', h.provider));
+                if (h.rdns) td.title = h.rdns;
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        return table;
     }
 
     function render_track() {
@@ -143,55 +211,36 @@
         head.setAttribute('aria-expanded', 'false');
 
         rcpts.forEach(function (r) {
-            var a = analyse(r.events || []), row = el('div', 'rt-rcpt'), steps = el('ul', 'rt-steps');
+            var a = analyse(r.events || []), row = el('div', 'rt-rcpt');
             if (a.delivered) delivered++;
             if (a.opens) opened++;
+            if (a.auto_opens) auto = true;
             clicks += a.clicks;
             if (a.problems.length) issues++;
 
-            row.appendChild(el('div', 'rt-email', r.email));
+            var top = el('div', 'rt-rhead');
+            top.appendChild(el('span', 'rt-email', r.email));
+            row.appendChild(top);
 
-            function step(cls, text, title) {
-                var li = el('li', 'rt-step rt-' + cls, text);
-                if (title) li.title = title;
-                steps.appendChild(li);
+            if (!a.rows.length) {
+                row.appendChild(el('div', 'rt-none', label('ev_none')));
+                body.appendChild(row);
+                return;
             }
 
-            a.retried.forEach(function (p) {
-                step('retried', label('ev_' + p.k) + ' · ' + fmt(p.d), tip(p.reason, ip_line(p.ip)));
-            });
-            if (a.delivered) step('ok', label('ev_delivered') + ' · ' + fmt(a.delivered), tip(ip_line(a.delivered_ip)));
-            else if (a.sent && !a.problems.length) step('wait', label('ev_sent') + ' · ' + fmt(a.sent), tip(ip_line(a.sent_ip)));
-            a.activity.forEach(function (x) {
-                if (x.k === 'clicked') {
-                    step('ok', label('ev_clicked') + ' · ' + fmt(x.d), tip(x.link, ip_line(x.ip)));
-                }
-                else if (x.auto) {
-                    // automatic open: shown apart, it does not prove a read
-                    auto = true;
-                    step('auto', label('ev_opened') + ' · ' + fmt(x.d) + ' *', tip(ip_line(x.ip), label('auto_open')));
-                }
-                else {
-                    step('ok', label('ev_opened') + ' · ' + fmt(x.d), tip(ip_line(x.ip)));
-                }
-            });
-            a.problems.forEach(function (p) {
-                step('bad', label('ev_' + p.k) + ' · ' + fmt(p.d), tip(p.reason, ip_line(p.ip)));
-            });
-            if (!(r.events || []).length) step('none', label('ev_none'));
-            row.appendChild(steps);
+            row.appendChild(stepper(a));
 
-            var links = Object.keys(a.links);
-            if (links.length) {
-                var ul = el('ul', 'rt-links');
-                links.forEach(function (l) {
-                    ul.appendChild(el('li', null, l + (a.links[l] > 1 ? ' (×' + a.links[l] + ')' : '')));
-                });
-                row.appendChild(ul);
-            }
-            a.problems.forEach(function (p) {
-                if (p.reason) row.appendChild(el('div', 'rt-reason', p.reason));
+            // full timeline, folded unless something went wrong
+            var toggle = el('button', 'rt-toggle', label('timeline') + ' (' + a.rows.length + ')'), table = timeline(a, data.hosts || {});
+            toggle.type = 'button';
+            table.hidden = !a.problems.length;
+            toggle.setAttribute('aria-expanded', table.hidden ? 'false' : 'true');
+            toggle.addEventListener('click', function () {
+                table.hidden = !table.hidden;
+                toggle.setAttribute('aria-expanded', table.hidden ? 'false' : 'true');
             });
+            top.appendChild(toggle);
+            row.appendChild(table);
             body.appendChild(row);
         });
 

@@ -19,6 +19,14 @@ API_KEY_FILE=/root/.config/brevo/api_key
 # recipients' IPs (or their provider's proxy): personal data, so off by default.
 #INCLUDE_IP=0
 
+# Identify each IP (needs INCLUDE_IP=1 and dig): reverse DNS name, shown under the IP with its domain. Cached 30 days
+# in STATE_DIR, 200 new lookups per run at most.
+#IP_LOOKUP=0
+
+# With IP_LOOKUP=1, also show each IP's network owner (e.g. Swisscom, Cloudflare), looked up at Team Cymru's public
+# DNS service: the IPs are then sent to that third party.
+#IP_ASN=0
+
 # Event window (days, 90 max at Brevo) and publication delay shown in Roundcube
 #EVENT_DAYS=90
 #LAG="up to 1-2 h"

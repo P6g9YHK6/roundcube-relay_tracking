@@ -8,3 +8,8 @@ $config['relay_tracking_dir'] = '/var/roundcube/relays';
 // Seconds without any event after which a sent mail is labelled "no tracking" (sent before the relay was in use or
 // through another relay). Before that it shows "pending", since relays publish their events with a delay.
 $config['relay_tracking_untracked_after'] = 86400;
+
+// Defaults of the user preferences (Settings > Preferences > Displaying Messages > Delivery tracking). Add them to
+// $config['dont_override'] to enforce them. They only change what is shown: the collector decides what is fetched.
+$config['relay_tracking_show_ip'] = true;
+$config['relay_tracking_show_owner'] = true;

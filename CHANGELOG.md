@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.0 (2026-11-24)
+
+- New recipient layout: a progress stepper (Sent > Delivered > Opened > Clicked, with dates and counts, problems in red)
+  and a folded timeline table, one row per event with time, event, detail and IP.
+- IP identification in the Brevo collector, each behind its own switch: `IP_LOOKUP=1` (reverse DNS, cached 30 days)
+  and `IP_ASN=1` (network owner via Team Cymru). The provider is shown under each IP in the timeline.
+- Restyled box: card layout, hover and keyboard focus states, scrolling timeline, phone layout.
+- User preferences (Settings > Preferences > Displaying Messages > Delivery tracking): show IP addresses, show who the
+  IP belongs to. Defaults `relay_tracking_show_ip` and `relay_tracking_show_owner`, lockable with `dont_override`.
+
 ## 2.0.0 (2026-11-23)
 
 Delivery tracking only.

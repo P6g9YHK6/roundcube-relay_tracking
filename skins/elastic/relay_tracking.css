@@ -1,29 +1,50 @@
 /* relay_tracking: tracking box of a sent mail (Elastic skin).
-   Neutral colours (transparency only) so it reads in light and dark mode. */
+   Colours are transparencies over the skin's own text and background, so it reads in light and dark mode alike;
+   green / red / amber only mark states. */
 
 #rt-track {
+    --rt-line: rgba(127, 127, 127, .22);
+    --rt-soft: rgba(127, 127, 127, .07);
+    --rt-ok: #30a46c;
+    --rt-bad: #e5484d;
+    --rt-auto: #b08800;
     margin: .75rem 0 0;
-    border: 1px solid rgba(127, 127, 127, .35);
-    border-radius: .5rem;
+    border: 1px solid var(--rt-line);
+    border-radius: .6rem;
+    background: rgba(127, 127, 127, .03);
     font-size: .9rem;
     overflow: hidden;
 }
 
 #rt-track.rt-alert {
-    border-color: rgba(229, 72, 77, .6);
+    border-color: rgba(229, 72, 77, .55);
 }
 
+#rt-track button {
+    font: inherit;
+    color: inherit;
+}
+
+#rt-track button:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+}
+
+/* ---------- head: title + summary of all recipients ---------- */
 #rt-track .rt-head {
     display: flex;
     align-items: center;
     gap: .75rem;
     width: 100%;
-    padding: .45rem .9rem;
+    padding: .6rem 1rem;
     border: 0;
     background: transparent;
-    color: inherit;
     text-align: left;
     cursor: pointer;
+}
+
+#rt-track .rt-head:not(:disabled):hover {
+    background: var(--rt-soft);
 }
 
 #rt-track .rt-head:disabled {
@@ -34,12 +55,12 @@
     content: "\f201";                  /* chart: tracking */
     font-family: "Icons";
     font-weight: 900;
-    opacity: .75;
+    opacity: .7;
 }
 
 #rt-track.rt-alert .rt-head:before {
     content: "\f071";
-    color: #e5484d;
+    color: var(--rt-bad);
     opacity: 1;
 }
 
@@ -49,7 +70,7 @@
     font-weight: 900;
     font-size: .75rem;
     margin-left: auto;
-    opacity: .6;
+    opacity: .55;
     transition: transform .15s;
 }
 
@@ -63,7 +84,7 @@
 }
 
 #rt-track .rt-summary {
-    opacity: .8;
+    opacity: .75;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -71,58 +92,213 @@
 }
 
 #rt-track .rt-body {
-    padding: .25rem .9rem .6rem;
-    border-top: 1px solid rgba(127, 127, 127, .2);
+    padding: 0 1rem .6rem;
+    border-top: 1px solid var(--rt-line);
 }
 
+/* ---------- one recipient ---------- */
 #rt-track .rt-rcpt {
-    padding: .5rem 0;
+    padding: .75rem 0 .5rem;
 }
 
 #rt-track .rt-rcpt + .rt-rcpt {
-    border-top: 1px dashed rgba(127, 127, 127, .25);
+    border-top: 1px solid var(--rt-line);
+}
+
+#rt-track .rt-rhead {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: .55rem;
 }
 
 #rt-track .rt-email {
     font-weight: 600;
     word-break: break-all;
-    margin-bottom: .3rem;
 }
 
-#rt-track .rt-steps {
+#rt-track .rt-toggle {
+    margin-left: auto;
+    flex: none;
+    padding: .15rem .65rem;
+    border: 1px solid var(--rt-line);
+    border-radius: 1rem;
+    background: transparent;
+    font-size: .78rem;
+    cursor: pointer;
+}
+
+#rt-track .rt-toggle:hover {
+    background: var(--rt-soft);
+}
+
+#rt-track .rt-toggle:after {
+    content: "\f078";
+    font-family: "Icons";
+    font-weight: 900;
+    font-size: .65rem;
+    margin-left: .4rem;
+    opacity: .6;
+}
+
+#rt-track .rt-toggle[aria-expanded="true"]:after {
+    content: "\f077";
+}
+
+#rt-track .rt-none {
+    font-size: .85rem;
+    opacity: .65;
+}
+
+/* ---------- stepper: Sent > Delivered > Opened > Clicked ---------- */
+#rt-track .rt-stepper {
     display: flex;
-    flex-wrap: wrap;
-    gap: .35rem;
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
-#rt-track .rt-step {
-    padding: .1rem .55rem;
-    border-radius: 1rem;
+#rt-track .rt-st {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 .4rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: .1rem;
+}
+
+/* connector from the previous step's dot to this one */
+#rt-track .rt-st + .rt-st:before {
+    content: "";
+    position: absolute;
+    top: .3rem;
+    right: calc(100% - .1rem);
+    width: calc(100% - .9rem);
+    height: 2px;
+    background: var(--rt-line);
+}
+
+#rt-track .rt-st-done + .rt-st-done:before,
+#rt-track .rt-st-done + .rt-st-auto:before {
+    background: var(--rt-ok);
+}
+
+#rt-track .rt-dot {
+    width: .75rem;
+    height: .75rem;
+    border-radius: 50%;
+    border: 2px solid rgba(127, 127, 127, .45);
+    background: transparent;
+    box-sizing: border-box;
+    margin-bottom: .2rem;
+}
+
+#rt-track .rt-st-done .rt-dot { border-color: var(--rt-ok); background: var(--rt-ok); }
+#rt-track .rt-st-bad .rt-dot { border-color: var(--rt-bad); background: var(--rt-bad); }
+#rt-track .rt-st-auto .rt-dot { border-color: var(--rt-auto); border-style: dashed; }
+
+#rt-track .rt-st-label {
     font-size: .8rem;
-    background: rgba(127, 127, 127, .14);
+    font-weight: 600;
+}
+
+#rt-track .rt-st-todo .rt-st-label { opacity: .45; font-weight: 400; }
+#rt-track .rt-st-bad .rt-st-label { color: var(--rt-bad); }
+#rt-track .rt-st-auto .rt-st-label { color: var(--rt-auto); }
+
+#rt-track .rt-st-meta {
+    font-size: .75rem;
+    opacity: .7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- timeline: one row per event, scrolls after ~18 rows ---------- */
+#rt-track .rt-timeline {
+    display: block;
+    max-height: 18rem;
+    overflow: auto;
+    margin: .7rem 0 .2rem;
+    border: 1px solid var(--rt-line);
+    border-radius: .4rem;
+    border-collapse: collapse;
+    font-size: .8rem;
+}
+
+#rt-track .rt-timeline[hidden] {
+    display: none;
+}
+
+#rt-track .rt-timeline th,
+#rt-track .rt-timeline td {
+    padding: .3rem .75rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+#rt-track .rt-timeline thead th {
+    border-bottom: 1px solid var(--rt-line);
+    font-weight: 600;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    opacity: .75;
+}
+
+#rt-track .rt-timeline tbody tr:nth-child(even) {
+    background: rgba(127, 127, 127, .05);
+}
+
+#rt-track .rt-time,
+#rt-track .rt-ev {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+#rt-track .rt-detail {
+    word-break: break-all;
+    min-width: 10rem;
+}
+
+#rt-track .rt-ip-addr {
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .78rem;
     white-space: nowrap;
 }
 
-#rt-track .rt-ok { background: rgba(48, 164, 108, .18); }
-#rt-track .rt-auto { background: rgba(127, 127, 127, .14); font-style: italic; }
-#rt-track .rt-bad { background: rgba(229, 72, 77, .2); }
-#rt-track .rt-none { opacity: .7; }
-#rt-track .rt-retried { background: rgba(127, 127, 127, .14); opacity: .85; }
-
-#rt-track .rt-links {
-    margin: .35rem 0 0;
-    padding-left: 1.2rem;
-    font-size: .8rem;
-    opacity: .85;
-    word-break: break-all;
+#rt-track .rt-ip-owner {
+    display: block;
+    font-size: .72rem;
+    opacity: .65;
+    white-space: nowrap;
 }
 
-#rt-track .rt-reason,
+#rt-track .rt-row-auto { color: var(--rt-auto); }
+#rt-track .rt-row-retried td { opacity: .55; }
+#rt-track .rt-row-bad .rt-ev { color: var(--rt-bad); font-weight: 600; }
+
 #rt-track .rt-note {
-    margin: .35rem 0 0;
-    font-size: .8rem;
-    opacity: .75;
+    margin: .5rem 0 0;
+    font-size: .78rem;
+    opacity: .7;
+}
+
+/* phone: stepper in two rows, no connectors */
+@media (max-width: 480px) {
+    #rt-track .rt-stepper {
+        flex-wrap: wrap;
+        row-gap: .5rem;
+    }
+
+    #rt-track .rt-st {
+        flex: 1 1 45%;
+    }
+
+    #rt-track .rt-st + .rt-st:before {
+        display: none;
+    }
 }
