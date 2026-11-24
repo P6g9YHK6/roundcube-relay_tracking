@@ -8,7 +8,7 @@ delivery show as retries, and automatic opens (image proxies of Apple, Proton, .
 
 Each recipient gets a progress stepper (Sent > Delivered > Opened > Clicked, with dates and counts, problems in red) and
 a folded **timeline**: one row per event with time, event, detail (clicked link, bounce reason) and, when the
-collector provides them, the IP address with its reverse DNS domain or network owner.
+collector provides them, the IP address with its location, reverse DNS domain or network owner.
 
 Translations: English, French.
 
@@ -40,6 +40,7 @@ The plugin only shows up for a user who has an **identity on a domain** declared
 | `relay_tracking_untracked_after` | `86400` | seconds without any event after which a mail is labelled "no tracking" (before that: "pending", relays publish late) |
 | `relay_tracking_show_ip` | `true` | default of the user preference "Show IP addresses" (Settings > Preferences > Displaying Messages > Delivery tracking) |
 | `relay_tracking_show_owner` | `true` | default of the user preference "Show who the IP belongs to" |
+| `relay_tracking_show_location` | `true` | default of the user preference "Show where the IP is" |
 
 The two preferences only change what is shown; the collector decides what is fetched. Add them to
 `$config['dont_override']` to enforce the defaults.
@@ -52,7 +53,20 @@ prove a read. By default the common format carries no IP address or user agent, 
 reason. A collector may add the IP of each event when asked to (`INCLUDE_IP=1` for Brevo); it is the recipient's IP
 (or their provider's proxy), so personal data: only turn it on if you have a basis for processing it. Identifying the
 IPs is a separate switch (`IP_LOOKUP=1`: reverse DNS), and the network owner lookup another one (`IP_ASN=1`), which
-sends the IPs to Team Cymru's public DNS service.
+sends the IPs to Team Cymru's public DNS service. The location (`IP_GEO=1`) is looked up locally in DB-IP data, see
+below: the IPs never leave the server.
+
+### IP locations (DB-IP Lite)
+
+The `geoip` branch of this repository holds [DB-IP](https://db-ip.com)'s free "IP to City Lite" database, converted
+by [`tools/dbip-convert.py`](tools/dbip-convert.py) to two xz files (about 18 MB): range starts and a location table.
+A GitHub Actions workflow ([`.github/workflows/geoip.yml`](.github/workflows/geoip.yml)) checks DB-IP every day and,
+when a new month is out, replaces the branch with a single commit, so the repository does not grow.
+
+With `IP_GEO=1` the Brevo collector reads the branch's `VERSION` once a day, downloads the files when it changed, and
+searches them locally (one awk pass over the ranges, only for IPs not yet cached for that version). Set `GEO_URL` to
+use your own copy. The data is licensed CC BY 4.0: the tracking box credits "IP Geolocation by DB-IP" wherever a
+location is shown.
 
 ## Common format v1 (contract between collector and plugin)
 
@@ -62,7 +76,7 @@ Folder `<relay_tracking_dir>/<id>/` (`id`: `[a-z0-9_-]{1,32}`). Files written by
 | File | Content |
 |---|---|
 | `relay.json` | `{"format": 1, "id", "name", "domains": [..], "capabilities": [..], "lag": "free text", "events_days": n}` |
-| `events.json` | `{"generated": epoch, "days": n, "since"?: epoch, "messages": {"<Message-ID>": {"recipient": [[ISO 8601 date, type, extra?, ip?], ...]}}, "hosts"?: {"<ip>": {"rdns", "provider"}}}` |
+| `events.json` | `{"generated": epoch, "days": n, "since"?: epoch, "messages": {"<Message-ID>": {"recipient": [[ISO 8601 date, type, extra?, ip?], ...]}}, "hosts"?: {"<ip>": {"rdns", "provider", "country"?, "region"?, "city"?}}}` |
 
 - **Capabilities** (`capabilities`): `events` (required for the plugin to use the relay), `opens`, `clicks`.
 - **`<Message-ID>` key**: the `Message-ID` header of the mail as Roundcube sent it, angle brackets included. The
@@ -76,7 +90,8 @@ Folder `<relay_tracking_dir>/<id>/` (`id`: `[a-z0-9_-]{1,32}`). Files written by
   `clicked`, `spam`, `unsubscribed` (any other type is ignored). `extra` = link for `clicked`, reason for a bounce
   (`""` when there is none but an `ip` follows); `ip` = optional IP address of the event.
 - **`hosts`** in `events.json` (optional): for the IPs above, `rdns` = reverse DNS name and `provider` = who the IP
-  belongs to (network owner, the reverse DNS domain, or `private network`), shown in the timeline.
+  belongs to (network owner, the reverse DNS domain, or `private network`), and `country`, `region`, `city` from the
+  location data; shown in the timeline.
 - **Permissions**: relay folder `755`, files `644`.
 
 ## Writing a collector for another relay

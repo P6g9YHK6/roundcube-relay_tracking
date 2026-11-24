@@ -27,6 +27,11 @@ API_KEY_FILE=/root/.config/brevo/api_key
 # DNS service: the IPs are then sent to that third party.
 #IP_ASN=0
 
+# Location of each IP (needs INCLUDE_IP=1 and xz): DB-IP Lite data from the plugin's geoip branch, downloaded when it
+# changes (about 18 MB, checked once a day) and searched locally, the IPs never leave this server.
+#IP_GEO=0
+#GEO_URL=https://raw.githubusercontent.com/P6g9YHK6/roundcube-relay_tracking/geoip
+
 # Event window (days, 90 max at Brevo) and publication delay shown in Roundcube
 #EVENT_DAYS=90
 #LAG="up to 1-2 h"

@@ -49,7 +49,7 @@ class relay_tracking extends rcube_plugin
         return [
             'name' => 'relay_tracking',
             'vendor' => 'p6g9yhk6',
-            'version' => '2.1.0',
+            'version' => '2.2.0',
             'license' => 'GPL-3.0-or-later',
             'uri' => 'https://github.com/P6g9YHK6/roundcube-relay_tracking',
         ];
@@ -184,9 +184,10 @@ class relay_tracking extends rcube_plugin
             $rcpts[strtolower($addr)] = true;
         }
 
-        // user preferences: IP addresses, and who they belong to
+        // user preferences: IP addresses, who they belong to, where they are
         $show_ip = (bool) $this->rc->config->get('relay_tracking_show_ip', true);
         $show_owner = $show_ip && (bool) $this->rc->config->get('relay_tracking_show_owner', true);
+        $show_location = $show_ip && (bool) $this->rc->config->get('relay_tracking_show_location', true);
 
         $out = [];
         $hosts = [];   // reverse DNS / provider of the IPs this mail's events carry (only those)
@@ -198,11 +199,20 @@ class relay_tracking extends rcube_plugin
                 }
                 foreach ($list as $ev) {
                     $ip = (string) ($ev[3] ?? '');
-                    if ($show_owner && $ip !== '' && isset($events['hosts'][$ip]) && is_array($events['hosts'][$ip])) {
-                        $hosts[$ip] = [
-                            'rdns' => (string) ($events['hosts'][$ip]['rdns'] ?? ''),
-                            'provider' => (string) ($events['hosts'][$ip]['provider'] ?? ''),
-                        ];
+                    if ($ip === '' || !isset($events['hosts'][$ip]) || !is_array($events['hosts'][$ip])) {
+                        continue;
+                    }
+                    $host = $events['hosts'][$ip];
+                    $hosts[$ip] = [];
+                    if ($show_owner) {
+                        $hosts[$ip]['rdns'] = (string) ($host['rdns'] ?? '');
+                        $hosts[$ip]['provider'] = (string) ($host['provider'] ?? '');
+                    }
+                    if ($show_location) {
+                        // "City, Region, CC" without the empty or repeated parts (Zurich, Zurich, CH > Zurich, CH)
+                        $parts = array_values(array_unique(array_filter([(string) ($host['city'] ?? ''),
+                            (string) ($host['region'] ?? ''), (string) ($host['country'] ?? '')], 'strlen')));
+                        $hosts[$ip]['location'] = implode(', ', $parts);
                     }
                 }
                 $out[] = ['email' => $addr, 'events' => $list];
@@ -236,7 +246,7 @@ class relay_tracking extends rcube_plugin
 
     // ------------------------------------------------------------------ preferences
 
-    private const PREFS = ['relay_tracking_show_ip', 'relay_tracking_show_owner'];
+    private const PREFS = ['relay_tracking_show_ip', 'relay_tracking_show_owner', 'relay_tracking_show_location'];
 
     /** preferences_list hook: "Delivery tracking" block in Displaying Messages, for users with a tracked relay */
     public function preferences_list($args)

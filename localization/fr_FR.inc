@@ -35,3 +35,5 @@ $labels['auto_only'] = 'automatique seulement';
 $labels['pref_block'] = 'Suivi d’envoi';
 $labels['pref_show_ip'] = 'Afficher les adresses IP';
 $labels['pref_show_owner'] = 'Afficher à qui appartient l’IP';
+$labels['pref_show_location'] = 'Afficher où se trouve l’IP';
+$labels['geo_credit'] = 'Localisation des IP : IP Geolocation by';

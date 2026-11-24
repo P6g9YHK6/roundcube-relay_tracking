@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.2.0 (2026-11-24)
+
+- IP location (city, region, country) under each IP in the timeline, from DB-IP's free "IP to City Lite" data: a daily
+  GitHub Actions workflow keeps it on the `geoip` branch, the Brevo collector downloads it when it changes and searches
+  it locally (`IP_GEO=1`, off by default). Credited "IP Geolocation by DB-IP" as CC BY 4.0 requires.
+- New user preference "Show where the IP is" (`relay_tracking_show_location`).
+
 ## 2.1.0 (2026-11-24)
 
 - New recipient layout: a progress stepper (Sent > Delivered > Opened > Clicked, with dates and counts, problems in red)

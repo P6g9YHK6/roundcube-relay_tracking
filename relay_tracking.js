@@ -184,9 +184,10 @@
             tr.appendChild(ev);
             if (with_detail) tr.appendChild(el('td', 'rt-detail', x.detail));
             if (with_ip) {
-                // IP, then who it belongs to (network owner or reverse DNS domain); full reverse DNS name on hover
+                // IP, then where it is and who it belongs to (network owner or reverse DNS domain); reverse DNS name on hover
                 var td = el('td', 'rt-ip'), h = hosts[x.ip] || {};
                 td.appendChild(el('span', 'rt-ip-addr', x.ip));
+                if (h.location) td.appendChild(el('span', 'rt-ip-geo', h.location));
                 if (h.provider) td.appendChild(el('span', 'rt-ip-owner', h.provider));
                 if (h.rdns) td.title = h.rdns;
                 tr.appendChild(td);
@@ -264,6 +265,15 @@
         if (data.known) {
             if (auto) {
                 body.appendChild(el('p', 'rt-note', '* ' + label('auto_open')));
+            }
+            // DB-IP Lite data is CC BY 4.0: credit it wherever a location is shown
+            if (Object.keys(data.hosts || {}).some(function (ip) { return data.hosts[ip].location; })) {
+                var credit = el('p', 'rt-note rt-credit', label('geo_credit') + ' '), a = el('a', null, 'DB-IP');
+                a.href = 'https://db-ip.com';
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                credit.appendChild(a);
+                body.appendChild(credit);
             }
             body.hidden = true;
             box.appendChild(body);

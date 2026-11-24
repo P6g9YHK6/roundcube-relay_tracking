@@ -270,6 +270,21 @@
     white-space: nowrap;
 }
 
+#rt-track .rt-ip-geo {
+    display: block;
+    font-size: .74rem;
+    white-space: nowrap;
+}
+
+#rt-track .rt-ip-geo:before {
+    content: "\f3c5";                  /* map marker */
+    font-family: "Icons";
+    font-weight: 900;
+    font-size: .65rem;
+    margin-right: .3rem;
+    opacity: .55;
+}
+
 #rt-track .rt-ip-owner {
     display: block;
     font-size: .72rem;
@@ -280,6 +295,11 @@
 #rt-track .rt-row-auto { color: var(--rt-auto); }
 #rt-track .rt-row-retried td { opacity: .55; }
 #rt-track .rt-row-bad .rt-ev { color: var(--rt-bad); font-weight: 600; }
+
+#rt-track .rt-credit a {
+    color: inherit;
+    text-decoration: underline;
+}
 
 #rt-track .rt-note {
     margin: .5rem 0 0;

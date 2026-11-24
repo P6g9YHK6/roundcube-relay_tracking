@@ -13,3 +13,4 @@ $config['relay_tracking_untracked_after'] = 86400;
 // $config['dont_override'] to enforce them. They only change what is shown: the collector decides what is fetched.
 $config['relay_tracking_show_ip'] = true;
 $config['relay_tracking_show_owner'] = true;
+$config['relay_tracking_show_location'] = true;
