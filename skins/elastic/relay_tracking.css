@@ -285,6 +285,17 @@
     white-space: nowrap;
 }
 
+#rt-track a.rt-ip-addr {
+    color: inherit;
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+}
+
+#rt-track a.rt-ip-addr:hover,
+#rt-track a.rt-ip-addr:focus-visible {
+    text-decoration-style: solid;
+}
+
 #rt-track .rt-ip-geo {
     display: block;
     font-size: .74rem;

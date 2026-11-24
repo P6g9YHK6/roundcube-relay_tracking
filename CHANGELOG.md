@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.0 (2026-11-24)
+
+- Public IPs in the timeline are links to their iplocation.net lookup page ("Click for more info"); private addresses
+  stay plain text. The reverse DNS name moved to the hover of the owner line.
+
 ## 2.2.2 (2026-11-24)
 
 - Dates follow the user's Roundcube settings (date and time format, pretty dates, timezone): the server formats them

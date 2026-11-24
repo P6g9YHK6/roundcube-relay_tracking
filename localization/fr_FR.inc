@@ -37,3 +37,4 @@ $labels['pref_show_ip'] = 'Afficher les adresses IP';
 $labels['pref_show_owner'] = 'Afficher à qui appartient l’IP';
 $labels['pref_show_location'] = 'Afficher où se trouve l’IP';
 $labels['geo_credit'] = 'Localisation des IP : IP Geolocation by';
+$labels['ip_more'] = 'Cliquer pour plus d’infos';

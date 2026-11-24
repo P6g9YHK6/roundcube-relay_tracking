@@ -76,6 +76,10 @@
     // Temporary failures: once the mail is delivered afterwards they are only retries (greylisting, full mailbox...)
     var TRANSIENT = ['deferred', 'soft_bounce'];
 
+    // Clicking a public IP in the timeline opens this lookup page
+    var IP_LOOKUP_URL = 'https://www.iplocation.net/ip-lookup?query=';
+    var PRIVATE_IP = /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|127\.|169\.254\.|::1$|f[cd]|fe80:)/i;
+
     // An open this close to delivery is almost certainly the provider's image proxy (Proton, Apple...), not a reader
     var AUTO_OPEN_MS = 20000;
 
@@ -189,12 +193,25 @@
             tr.appendChild(ev);
             if (with_detail) tr.appendChild(el('td', 'rt-detail', x.detail));
             if (with_ip) {
-                // IP, then where it is and who it belongs to (network owner or reverse DNS domain); reverse DNS name on hover
-                var td = el('td', 'rt-ip'), h = hosts[x.ip] || {};
-                td.appendChild(el('span', 'rt-ip-addr', x.ip));
+                // IP (a link for public ones), then where it is and who it belongs to; reverse DNS name on hover of the owner
+                var td = el('td', 'rt-ip'), h = hosts[x.ip] || {}, addr, owner;
+                if (x.ip && !PRIVATE_IP.test(x.ip)) {
+                    // public IP: opens a lookup page (the IP then goes to that site, only when clicked)
+                    addr = el('a', 'rt-ip-addr', x.ip);
+                    addr.href = IP_LOOKUP_URL + encodeURIComponent(x.ip);
+                    addr.target = '_blank';
+                    addr.rel = 'noopener noreferrer';
+                    addr.title = label('ip_more');
+                }
+                else {
+                    addr = el('span', 'rt-ip-addr', x.ip);
+                }
+                td.appendChild(addr);
                 if (h.location) td.appendChild(el('span', 'rt-ip-geo', h.location));
-                if (h.provider) td.appendChild(el('span', 'rt-ip-owner', h.provider));
-                if (h.rdns) td.title = h.rdns;
+                if (h.provider) {
+                    owner = td.appendChild(el('span', 'rt-ip-owner', h.provider));
+                    if (h.rdns) owner.title = h.rdns;
+                }
                 tr.appendChild(td);
             }
             tbody.appendChild(tr);
