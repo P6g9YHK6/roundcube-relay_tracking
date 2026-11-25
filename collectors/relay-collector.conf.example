@@ -1,0 +1,59 @@
+# Settings of a relay_tracking collector: copy to <relay>.conf (chmod 600, owned by the user running the collector),
+# adapt, and run relay-collector.sh with it. One file per relay.
+
+# Relay: brevo, postmark, mailgun, sendgrid, mailjet, lettermint, smtp2go, scaleway, mailersend, ses or resend
+# (a driver in relays/). Its own settings are at the end of this file.
+RELAY=brevo
+
+# Relay folder, mounted (read-only is enough) in the Roundcube container under $config['relay_tracking_dir']/<relay>
+RELAY_DIR=/srv/relay-tracking/data/brevo
+
+# Sender domains whose mail goes out through the relay (space separated). Events of other senders on the same relay
+# account are left out.
+DOMAINS="example.org"
+
+# Relay API key (file holding only the key, chmod 600, outside any Git repository). What it must be allowed to do,
+# and its form for the relays with two parts (Mailjet, Amazon SES), is in the header of relays/<relay>.sh.
+API_KEY_FILE=/srv/relay-tracking/collector/brevo.key
+
+# Lock, caches, accumulated events and location data (root 700); keep it on persistent storage, one per relay
+STATE_DIR=/srv/relay-tracking/collector/state/brevo
+
+# Keep the IP address of each event (open, click...), shown in Roundcube. These are the recipients' IPs (or their
+# provider's proxy): personal data, so off by default. Not every relay gives them.
+#INCLUDE_IP=0
+
+# Identify each IP (needs INCLUDE_IP=1 and dig): reverse DNS name, shown under the IP with its domain. Cached 30 days
+# in STATE_DIR, 200 new lookups per run at most.
+#IP_LOOKUP=0
+
+# With IP_LOOKUP=1, also show each IP's network owner (e.g. Swisscom, Cloudflare), looked up at Team Cymru's public
+# DNS service: the IPs are then sent to that third party.
+#IP_ASN=0
+
+# Location of each IP (needs INCLUDE_IP=1 and xz): DB-IP Lite data from the plugin's geoip branch, downloaded when it
+# changes (about 18 MB, checked once a day) and searched locally, the IPs never leave this server.
+#IP_GEO=0
+#GEO_URL=https://raw.githubusercontent.com/P6g9YHK6/roundcube-relay_tracking/geoip
+
+# Event window in days (default and maximum: what the relay keeps) and publication delay shown in Roundcube
+#EVENT_DAYS=30
+#LAG="a few minutes"
+
+# ---------------------------------------------------------------- relay settings (only the chosen relay's)
+# Postmark: message stream used for SMTP
+#POSTMARK_STREAM=outbound
+# Mailgun: region of the sending domains, us or eu
+#MAILGUN_REGION=us
+# SMTP2GO: regional API endpoint
+#SMTP2GO_API=https://api.smtp2go.com/v3
+# Scaleway TEM: project (required) and region
+#SCW_PROJECT_ID=
+#SCW_REGION=fr-par
+# MailerSend: Postfix log (files, or a command printing it) and the domain ids (default: looked up from DOMAINS)
+#MAIL_LOG="/var/log/mail.log /var/log/mail.log.1"
+#MAIL_LOG_CMD="journalctl -u postfix --since -1d -o short"
+#MAILERSEND_DOMAIN_IDS=
+# Amazon SES: the SQS queue the events are published to, and its region (default: from the URL)
+#SES_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/123456789012/ses-events
+#SES_REGION=eu-west-1

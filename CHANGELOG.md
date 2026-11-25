@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.4.0 (2026-11-25)
+
+- Collectors for Postmark, Mailgun, SendGrid, Mailjet, Lettermint, SMTP2GO, Scaleway TEM, MailerSend, Amazon SES and
+  Resend, next to Brevo. One script, `collectors/relay-collector.sh`, takes a settings file naming the relay
+  (`RELAY=...`); each relay is a driver in `collectors/relays/` with links to the API documentation it follows. The IP
+  lookups, locations, dry run and output are shared by all of them.
+- Relays that do not report the Message-ID get it from a header the plugin adds when sending (`headers` in
+  `relay.json`, e.g. `X-PM-Metadata-rt-mid` for Postmark), removed by the relay before delivery.
+- `collectors/brevo/brevo-collector.sh` is replaced by `relay-collector.sh` with `RELAY=brevo`; an installed copy of
+  the old script keeps working.
+
 ## 2.3.0 (2026-11-24)
 
 - Public IPs in the timeline are links to their iplocation.net lookup page ("Click for more info"); private addresses

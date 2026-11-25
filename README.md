@@ -1,7 +1,8 @@
 # relay_tracking: delivery tracking for Roundcube
 
-Roundcube plugin for mail sent through a **transactional SMTP relay** (Brevo, ...): every sent mail shows, per
-recipient, whether it was delivered, opened, clicked, bounced, reported as spam or unsubscribed.
+Roundcube plugin for mail sent through a **transactional SMTP relay** (Brevo, Postmark, Mailgun, SendGrid, Mailjet,
+Lettermint, SMTP2GO, Scaleway TEM, MailerSend, Amazon SES, Resend): every sent mail shows, per recipient, whether it
+was delivered, opened, clicked, bounced, reported as spam or unsubscribed.
 
 ![Tracking box of a sent mail: stepper per recipient and the timeline of the first one, with IP location and owner](docs/screenshot-tracking.png)
 
@@ -22,14 +23,15 @@ recipient, whether it was delivered, opened, clicked, bounced, reported as spam 
 - Dates in the user's Roundcube date format and timezone; English and French; light and dark mode.
 
 **Roundcube holds no relay key.** A collector (a script on the server, with the key) reads the relay's API and writes
-JSON files to a folder Roundcube only reads. One relay = one subfolder = one collector. A collector for **Brevo** is
-included.
+JSON files to a folder Roundcube only reads. One relay = one subfolder = one settings file for the collector, which
+has a driver per relay (see [Relays](#relays)).
 
 ## Requirements
 
 - Roundcube 1.6 or later with the Elastic skin (or a skin derived from it), PHP 7.3 or later.
-- On the server running the collector: bash 4+, curl, jq, flock, GNU date; `dig` for reverse DNS, `xz` for locations.
-- A Brevo API key allowed to read transactional statistics.
+- On the server running the collector: bash 4+, curl (7.75+ for Amazon SES), jq 1.6+, flock, GNU date; `dig` for
+  reverse DNS, `xz` for locations.
+- A relay API key allowed to read its events (what each relay needs is in the header of its driver).
 
 ## Installation
 
@@ -77,38 +79,44 @@ Then tell the plugin where the data is (default `/var/roundcube/relays`):
 $config['relay_tracking_dir'] = '/var/roundcube/relays';
 ```
 
-### 3. Collector (Brevo)
+### 3. Collector
 
-On the server, as root:
+On the server, as root (Brevo here; any relay of the [list](#relays)):
 
 ```sh
 C=/srv/relay-tracking/collector
-cp collectors/brevo/brevo-collector.sh $C/
-cp collectors/brevo/brevo-collector.conf.example $C/brevo-collector.conf
-chmod 600 $C/brevo-collector.conf
+cp -r collectors/relay-collector.sh collectors/relays $C/
+cp collectors/relay-collector.conf.example $C/brevo.conf
+chmod 600 $C/brevo.conf
 
 # the API key, alone in its file (paste it, then Ctrl-D)
-umask 077; cat > $C/api_key
+umask 077; cat > $C/brevo.key
 ```
 
-Edit `brevo-collector.conf`:
+Edit `brevo.conf`:
 
 ```sh
+RELAY=brevo
 RELAY_DIR=/srv/relay-tracking/data/brevo
 DOMAINS="example.org"
-API_KEY_FILE=/srv/relay-tracking/collector/api_key
-STATE_DIR=/srv/relay-tracking/collector/state
+API_KEY_FILE=/srv/relay-tracking/collector/brevo.key
+STATE_DIR=/srv/relay-tracking/collector/state/brevo
 ```
 
-plus the optional settings below. Try it without writing anything, then schedule it every 5 minutes:
+plus the optional settings below and those of the relay. Try it without writing anything, then schedule it every 5
+minutes:
 
 ```sh
-DRY_RUN=1 $C/brevo-collector.sh
-echo "*/5 * * * * root $C/brevo-collector.sh" > /etc/cron.d/relay-tracking
+DRY_RUN=1 $C/relay-collector.sh $C/brevo.conf
+echo "*/5 * * * * root $C/relay-collector.sh $C/brevo.conf" > /etc/cron.d/relay-tracking
 ```
 
 The box appears for users with an identity on one of `DOMAINS`. Brevo publishes events up to 1-2 hours after
-sending; until then a mail shows as pending.
+sending; until then a mail shows as pending. For a second relay, add another settings file, folder and cron line.
+
+Upgrading from 2.3 and earlier: the old `brevo-collector.sh` keeps working. To move to the new one, copy the files
+as above, add `RELAY=brevo` to the existing settings file and point the cron line at
+`relay-collector.sh <settings file>`; nothing else changes.
 
 ## Configuration
 
@@ -129,21 +137,24 @@ The preferences only change what is shown; add them to `$config['dont_override']
 
 ### Collector
 
-Set in `brevo-collector.conf` (see [the example](collectors/brevo/brevo-collector.conf.example)).
+Set in the settings file (see [the example](collectors/relay-collector.conf.example)).
 
 | Setting | Default | |
 |---|---|---|
+| `RELAY` | required | relay: `brevo`, `postmark`, `mailgun`, `sendgrid`, `mailjet`, `lettermint`, `smtp2go`, `scaleway`, `mailersend`, `ses`, `resend` |
 | `RELAY_DIR` | required | output folder, e.g. `/srv/relay-tracking/data/brevo` |
-| `DOMAINS` | required | sender domains going through Brevo, space separated; other senders on the account are ignored |
+| `DOMAINS` | required | sender domains going through the relay, space separated; other senders on the account are ignored |
 | `API_KEY_FILE` | required | file holding only the API key (`chmod 600`) |
 | `INCLUDE_IP` | `0` | `1` keeps the IP of each event |
 | `IP_LOOKUP` | `0` | `1` adds each IP's reverse DNS name (needs `INCLUDE_IP=1`, `dig`) |
 | `IP_ASN` | `0` | `1` adds the network owner, looked up at Team Cymru (sends the IPs to that third party) |
 | `IP_GEO` | `0` | `1` adds the location from DB-IP Lite data, searched locally (needs `INCLUDE_IP=1`, `xz`) |
 | `GEO_URL` | this repo's `geoip` branch | where the location data is downloaded from |
-| `EVENT_DAYS` | `90` | days of events kept (Brevo's maximum) |
-| `LAG` | `up to 1-2 h` | publication delay shown while a mail is pending |
-| `STATE_DIR` | `/var/lib/relay-tracking-brevo` | lock, lookup caches and location data; keep it on persistent storage |
+| `EVENT_DAYS` | what the relay keeps | days of events kept |
+| `LAG` | the relay's | publication delay shown while a mail is pending |
+| `STATE_DIR` | `/var/lib/relay-tracking-<relay>` | lock, caches, accumulated events, location data; keep it on persistent storage |
+
+Relay settings (region, project, queue...) are listed at the end of the example and in each driver's header.
 
 The config file is sourced as shell: it must belong to the user running the collector and not be writable by others,
 or the collector refuses to start.
@@ -173,10 +184,12 @@ rename), folder `755` and files `644`:
 
 | File | Content |
 |---|---|
-| `relay.json` | `{"format": 1, "id", "name", "domains": [..], "capabilities": [..], "lag", "events_days"}` |
+| `relay.json` | `{"format": 1, "id", "name", "domains": [..], "capabilities": [..], "lag", "events_days", "headers"?: {..}}` |
 | `events.json` | `{"generated", "days", "since"?, "messages": {"<Message-ID>": {"<recipient>": [[date, type, extra?, ip?], ...]}}, "hosts"?: {"<ip>": {"rdns", "provider", "country"?, "region"?, "city"?}}}` |
 
 - `capabilities`: `events` (required), `opens`, `clicks`.
+- `headers`: headers the plugin adds to each mail sent from the relay's domains, `{message_id}` replaced by the mail's
+  Message-ID; for relays that do not report the Message-ID (names `X-...` only, removed by the relay before delivery).
 - `<Message-ID>`: the header as Roundcube sent it, angle brackets included. Recipient `"*"` = events without a
   recipient, applied to all of them.
 - `since`: start of the data when the collector could not read the whole `days` window; older mails then show
@@ -185,30 +198,30 @@ rename), folder `755` and files `644`:
   `proxy_open`, `clicked`, `spam`, `unsubscribed`; others are ignored. `extra` = clicked link or bounce reason (`""`
   when empty but an IP follows). Dates in ISO 8601.
 
-## Other relays
+## Relays
 
-A collector only has to produce the files above; the Brevo one is the model (key in a `600` file, headers never on a
-command line, atomic writes, lock, `DRY_RUN=1`, vocabulary mapping in `EVENT_MAP`).
+| Relay | Events read from | Correlation with the Message-ID | Opens / clicks | IP | Default window |
+|---|---|---|---|---|---|
+| **Brevo** | global feed | kept by Brevo | yes | yes | 90 d |
+| **Postmark** | search + details per message | `X-PM-Metadata-rt-mid` header | yes | first open, clicks | 45 d |
+| **Mailgun** | Logs API, since the last run | `X-Mailgun-Variables` header | yes | yes | 30 d (plan) |
+| **SendGrid** | Email Activity (paid add-on) | `X-SMTPAPI` unique argument | yes | no | 30 d |
+| **Mailjet** | messages + history per message | `X-MJ-CustomID` header | yes, no link | no | 30 d |
+| **Lettermint** | messages + events per message | `X-LM-Metadata-rt_mid` header | yes | no | 28 d |
+| **SMTP2GO** | activity search, since the last run | Message-ID from the stored headers | yes | yes | 30 d (plan) |
+| **Scaleway TEM** | state of each email | `message_id` (to check) | no | no | 30 d |
+| **MailerSend** | activity, since the last run | `250 queued as` id from the Postfix log | yes | no | 30 d (plan) |
+| **Amazon SES** | SNS > SQS queue, emptied each run | original headers in each event | yes | yes | 90 d (kept by the collector) |
+| **Resend** | latest event per email only | `message_id` (to check) | latest only | no | 30 d |
 
-The hard part is finding the relay's events for a `Message-ID`: (a) the relay keeps it and returns it (Brevo);
-(b) a relay metadata header set at sending time with the `Message-ID`, which the API can filter on; (c) the relay's
-identifier in the SMTP `250` reply from the mail server log, mapped to the `Message-ID`.
+The headers are added by the plugin when sending (from `headers` in `relay.json`), so only mail sent after the
+collector first ran is tracked on those relays. Each driver in [`collectors/relays/`](collectors/relays) starts with
+what it does, the key it needs, its settings and links to the relay's API documentation.
 
-| Relay | Events by polling | Correlation | Opens / clicks |
-|---|---|---|---|
-| **Brevo** (included) | global feed, 90 d | (a) `messageId` | yes |
-| Lettermint | per message, no recipient per event, 28 d | (b) `X-LM-Metadata-*` | yes, per route |
-| Mailgun | global feed; 1 d on the free plan | (b) `X-Mailgun-Variables` | yes |
-| Postmark | search + detail per message, 45 d | (b) `X-PM-Metadata-*` | yes |
-| Amazon SES | with VDM (paid), otherwise SNS > SQS | (c) 250 reply | yes |
-| SendGrid | global feed (paid add-on) | (b) `X-SMTPAPI` `unique_args` | yes |
-| Mailjet | per message, no recipient or link | (b) `X-MJ-CustomID` | yes |
-| Scaleway TEM | state per recipient | `message_id` (to check) | no |
-| MailerSend | global feed; 1 d on the free plan | (c) 250 reply | yes |
-| SMTP2GO | global feed | headers returned (to check) | yes |
-| Resend | latest state only (webhooks) | `message_id` (to check) | yes |
-
-From the relays' API documentation, November 2026; check with a real send before writing a collector.
+Brevo runs in production; the other drivers follow the relays' API documentation (November 2026) and are tested
+against sample answers built from it, not yet against real accounts: try one with `DRY_RUN=1` and a real send first.
+A new relay needs only a driver: the contract is at the top of
+[`relay-collector.sh`](collectors/relay-collector.sh).
 
 ## License
 

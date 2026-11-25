@@ -49,7 +49,7 @@ class relay_tracking extends rcube_plugin
         return [
             'name' => 'relay_tracking',
             'vendor' => 'p6g9yhk6',
-            'version' => '2.3.0',
+            'version' => '2.4.0',
             'license' => 'GPL-3.0-or-later',
             'uri' => 'https://github.com/P6g9YHK6/roundcube-relay_tracking',
         ];
@@ -63,6 +63,13 @@ class relay_tracking extends rcube_plugin
         if ($this->rc->task == 'settings') {
             $this->add_hook('preferences_list', [$this, 'preferences_list']);
             $this->add_hook('preferences_save', [$this, 'preferences_save']);
+            return;
+        }
+
+        // sending: headers some relays need to report the mail's Message-ID (relay.json "headers")
+        if ($this->rc->action == 'send') {
+            $this->load_config();
+            $this->add_hook('message_before_send', [$this, 'add_headers']);
             return;
         }
 
@@ -119,10 +126,19 @@ class relay_tracking extends rcube_plugin
             }
             $domains = array_values(array_filter(array_map('strtolower', (array) ($data['domains'] ?? []))));
             if (array_intersect($domains, $mine)) {
+                // headers to add when sending: X- names only, one line values
+                $headers = [];
+                foreach ((array) ($data['headers'] ?? []) as $name => $value) {
+                    if (is_string($value) && preg_match('/^X-[A-Za-z0-9_-]{1,64}$/', (string) $name)
+                        && strlen($value) <= 500 && !preg_match('/[\x00-\x1f]/', $value)) {
+                        $headers[$name] = $value;
+                    }
+                }
                 $this->relays[$id] = [
                     'name' => (string) ($data['name'] ?? $id),
                     'domains' => $domains,
                     'lag' => (string) ($data['lag'] ?? ''),
+                    'headers' => $headers,
                 ];
             }
         }
@@ -139,6 +155,41 @@ class relay_tracking extends rcube_plugin
             }
         }
         return null;
+    }
+
+    /**
+     * message_before_send hook: for relays that do not report the Message-ID, the headers their collector asks for
+     * (relay.json "headers"), "{message_id}" replaced by the mail's Message-ID. The relays remove them before delivery.
+     */
+    public function add_headers($args)
+    {
+        $message = $args['message'] ?? null;
+        if (!is_object($message) || !method_exists($message, 'headers')) {
+            return $args;
+        }
+        $headers = (array) $message->headers();
+        $mid = trim((string) ($headers['Message-ID'] ?? ''));
+        $from = (string) ($args['from'] ?? '');
+        if ($from === '') {
+            $list = rcube_mime::decode_address_list((string) ($headers['From'] ?? ''), 1, true, null, true);
+            $from = (string) (reset($list) ?: '');
+        }
+        $relay = $this->relay_for_domain(self::domain_of($from));
+        if ($mid === '' || !$relay || empty($this->relays()[$relay]['headers'])) {
+            return $args;
+        }
+        if ($mid[0] !== '<') {
+            $mid = '<' . $mid . '>';
+        }
+        // safe inside the JSON some relays expect (Mailgun, SendGrid)
+        $mid = preg_replace('/[\x00-\x1f"\\\\]/', '', $mid);
+        $add = [];
+        foreach ($this->relays()[$relay]['headers'] as $name => $value) {
+            $add[$name] = str_replace('{message_id}', $mid, $value);
+        }
+        $message->headers($add, true);
+        $args['message'] = $message;
+        return $args;
     }
 
     /** message_load hook: "relay_tracking_msg" env for the tracking box. */

@@ -1,2 +1,3 @@
 config.inc.php
+collectors/*.conf
 collectors/*/*.conf
