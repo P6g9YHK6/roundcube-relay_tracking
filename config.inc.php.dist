@@ -14,3 +14,22 @@ $config['relay_tracking_untracked_after'] = 86400;
 $config['relay_tracking_show_ip'] = true;
 $config['relay_tracking_show_owner'] = true;
 $config['relay_tracking_show_location'] = true;
+
+// Self tracking: Roundcube itself adds an open pixel and sends the links of the HTML part through its own address,
+// and records opens and clicks in its database (tables from SQL/). Works without any relay. Off by default.
+$config['relay_tracking_self'] = false;
+
+// Public address of Roundcube in the pixel and links, e.g. 'https://mail.example.org/' (empty: the address the
+// mail was sent from). Set it when Roundcube is reached under another name than the one recipients can open.
+$config['relay_tracking_self_url'] = '';
+
+// Default of the user preference "Track opens and clicks of the mails I send" (Settings > Preferences > Composing
+// Messages), which ticks the "Track opens and clicks" box of each new mail. In $config['dont_override'], this value
+// applies to every mail and the box is not shown.
+$config['relay_tracking_self_track'] = true;
+
+// Keep the IP address of each open and click (personal data: only with a basis for it).
+$config['relay_tracking_self_ip'] = false;
+
+// Days the self tracking of a mail is kept (0: forever).
+$config['relay_tracking_self_days'] = 90;

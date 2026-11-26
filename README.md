@@ -16,6 +16,8 @@ was delivered, opened, clicked, bounced, reported as spam or unsubscribed.
 - **Timeline per recipient**: one row per event with time, event, detail (clicked link, bounce reason) and IP.
 - **Retries and automatic opens kept apart**: a deferral followed by a delivery is a retry, not a problem; opens by
   image proxies (Apple, Proton, ...) are marked as automatic, since only clicks prove a read.
+- **Self tracking** (optional): without a relay, or next to one, Roundcube itself adds an open pixel and sends the
+  links through its own address, and shows the opens and clicks in the same box. Chosen per mail in compose.
 - **IP details** (optional): location (city, region, country), network owner or reverse DNS domain, and a link to an
   online lookup.
 - **User preferences** (Settings > Preferences > Displaying Messages > Delivery tracking): show IP addresses, who they
@@ -118,6 +120,29 @@ Upgrading from 2.3 and earlier: the old `brevo-collector.sh` keeps working. To m
 as above, add `RELAY=brevo` to the existing settings file and point the cron line at
 `relay-collector.sh <settings file>`; nothing else changes.
 
+### Self tracking (optional)
+
+Needs no relay and no collector. Create the plugin's tables (Composer does it; by hand, from Roundcube's folder):
+
+```sh
+bin/initdb.sh --dir=plugins/relay_tracking/SQL --package=relay_tracking
+```
+
+then turn it on:
+
+```php
+$config['relay_tracking_self'] = true;
+// when recipients reach Roundcube under another address than the one used to send
+$config['relay_tracking_self_url'] = 'https://mail.example.org/';
+```
+
+The pixel and links point to `?_task=relay_tracking`, answered without a login: if a proxy or firewall puts Roundcube
+behind an authentication, let that through. Each new mail gets a "Track opens and clicks" box in its options, ticked
+per the user's preference (Settings > Preferences > Composing Messages). Only the HTML part is tracked: plain text
+mail is sent as it is. All recipients get the same mail, so an open or a click can come from any of them; the box shows
+one row for all of them, without delivery information. Opening the mail from the sender's own Roundcube session is not
+counted.
+
 ## Configuration
 
 ### Roundcube
@@ -132,8 +157,14 @@ Roundcube's main config.
 | `relay_tracking_show_ip` | `true` | default of the preference "Show IP addresses" |
 | `relay_tracking_show_owner` | `true` | default of the preference "Show who the IP belongs to" |
 | `relay_tracking_show_location` | `true` | default of the preference "Show where the IP is" |
+| `relay_tracking_self` | `false` | self tracking: open pixel and links served by Roundcube |
+| `relay_tracking_self_url` | `''` | public address of Roundcube in the pixel and links (empty: the one the mail was sent from) |
+| `relay_tracking_self_track` | `true` | default of the preference "Track opens and clicks of the mails I send" |
+| `relay_tracking_self_ip` | `false` | keep the IP of each open and click |
+| `relay_tracking_self_days` | `90` | days the self tracking of a mail is kept (`0`: forever) |
 
-The preferences only change what is shown; add them to `$config['dont_override']` to enforce the defaults.
+The display preferences only change what is shown; add them to `$config['dont_override']` to enforce the defaults.
+With `relay_tracking_self_track` in it, its value applies to every mail and the compose box is not shown.
 
 ### Collector
 
@@ -161,8 +192,9 @@ or the collector refuses to start.
 
 ## Privacy
 
-Open and click tracking is done by the relay (tracking pixel, rewritten links), not by this plugin; turn it off at the
-relay if you do not want it. Without `INCLUDE_IP` the data holds only dates, event types, clicked links and bounce
+Open and click tracking is done by the relay (tracking pixel, rewritten links); turn it off at the relay if you do not
+want it. The plugin only does it itself with self tracking (`relay_tracking_self`, off by default), on mail the sender
+chose to track; the IPs are then kept only with `relay_tracking_self_ip`. Without `INCLUDE_IP` the data holds only dates, event types, clicked links and bounce
 reasons. IP addresses are the recipients' (or their provider's proxy): personal data, so only keep them with a basis
 for it. Locations are looked up locally and never send the IPs anywhere; `IP_ASN` sends them to Team Cymru, and the
 IP link sends one IP to iplocation.net when clicked.

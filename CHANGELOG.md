@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.5.0 (2026-11-26)
+
+- Self tracking (`relay_tracking_self`, off by default): when sending, Roundcube adds an open pixel and sends the links
+  of the HTML part through its own address (`?_task=relay_tracking`, no login needed), records opens and clicks in two
+  new tables (`SQL/`) and shows them in the tracking box. Works without a relay; with one, its opens and clicks are
+  added to the relay's events.
+- "Track opens and clicks" box in the compose options, ticked per the new preference "Track opens and clicks of the
+  mails I send" (Settings > Preferences > Composing Messages, default `relay_tracking_self_track`).
+- Settings `relay_tracking_self_url`, `relay_tracking_self_ip` and `relay_tracking_self_days`.
+- Events of a mail are sorted by date after merging the ones without a recipient.
+
 ## 2.4.0 (2026-11-25)
 
 - Collectors for Postmark, Mailgun, SendGrid, Mailjet, Lettermint, SMTP2GO, Scaleway TEM, MailerSend, Amazon SES and

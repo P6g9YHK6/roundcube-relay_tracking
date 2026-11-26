@@ -15,6 +15,10 @@
  * When viewing a SENT mail from an identity on a relay's domain, a "Delivery tracking" box shows each recipient's
  * events, with the IP address on hover when the collector includes it (off by default).
  *
+ * SELF TRACKING (relay_tracking_self, off by default): when sending, the plugin itself adds an open pixel and
+ * rewrites the links of the HTML part to Roundcube (?_task=relay_tracking), which records the hits in its database
+ * (SQL/) and shows them in the same box, alone or next to a relay's events.
+ *
  * @author P6g9YHK6
  * @license GNU GPLv3+
  *
@@ -37,9 +41,21 @@
  */
 class relay_tracking extends rcube_plugin
 {
-    public $task = 'mail|settings';
+    // login, relay_tracking: open pixel and tracked links (recipients have no session, so the task is "login")
+    public $task = 'mail|settings|login|relay_tracking';
 
     private const FORMAT = 1;
+
+    // self tracking: hits kept per mail at most (a pixel URL can be requested by anyone)
+    private const SELF_MAX_HITS = 500;
+
+    // self tracking: an open this soon after sending, or by a client giving no detail at all (Apple Mail Privacy
+    // Protection), is the recipient's provider loading images on receipt, not a reader
+    private const SELF_AUTO_OPEN = 20;
+    private const SELF_AUTO_UA = '/^(Mozilla\/5\.0)?$/';
+
+    // 1x1 transparent GIF
+    private const PIXEL = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
     private $rc;
     private $relays = null;   // id => relay.json (only the user's relays)
@@ -49,7 +65,7 @@ class relay_tracking extends rcube_plugin
         return [
             'name' => 'relay_tracking',
             'vendor' => 'p6g9yhk6',
-            'version' => '2.4.0',
+            'version' => '2.5.0',
             'license' => 'GPL-3.0-or-later',
             'uri' => 'https://github.com/P6g9YHK6/roundcube-relay_tracking',
         ];
@@ -59,17 +75,35 @@ class relay_tracking extends rcube_plugin
     {
         $this->rc = rcmail::get_instance();
 
-        // Settings > Preferences > Displaying Messages: what the tracking box shows of the IP addresses
+        // self tracking: open pixel and tracked links, answered before Roundcube asks for a login
+        if (rcube_utils::get_input_string('_task', rcube_utils::INPUT_GET) === 'relay_tracking') {
+            $this->add_hook('startup', [$this, 'self_hit']);
+            return;
+        }
+        if ($this->rc->task == 'login') {
+            return;
+        }
+
+        // Settings > Preferences: what the tracking box shows of the IP addresses (Displaying Messages), self
+        // tracking by default (Composing Messages)
         if ($this->rc->task == 'settings') {
             $this->add_hook('preferences_list', [$this, 'preferences_list']);
             $this->add_hook('preferences_save', [$this, 'preferences_save']);
             return;
         }
 
-        // sending: headers some relays need to report the mail's Message-ID (relay.json "headers")
+        // sending: headers some relays need to report the mail's Message-ID (relay.json "headers"), self tracking
         if ($this->rc->action == 'send') {
             $this->load_config();
             $this->add_hook('message_before_send', [$this, 'add_headers']);
+            $this->add_hook('message_before_send', [$this, 'self_track']);
+            return;
+        }
+
+        // compose: "Track opens and clicks" in the options
+        if ($this->rc->action == 'compose') {
+            $this->load_config();
+            $this->compose_option();
             return;
         }
 
@@ -77,7 +111,7 @@ class relay_tracking extends rcube_plugin
             return;
         }
         $this->load_config();
-        if (!$this->relays()) {
+        if (!$this->relays() && !$this->self_enabled()) {
             return;
         }
         $this->include_stylesheet($this->local_skin_path() . '/relay_tracking.css');
@@ -94,6 +128,13 @@ class relay_tracking extends rcube_plugin
     {
         $pos = strrpos((string) $email, '@');
         return $pos === false ? '' : strtolower(substr($email, $pos + 1));
+    }
+
+    /** Message-ID with its angle brackets, as the collectors key it ('' when none). */
+    private static function message_id($mid)
+    {
+        $mid = trim((string) $mid);
+        return $mid !== '' && $mid[0] !== '<' ? '<' . $mid . '>' : $mid;
     }
 
     /** Addresses of the user's identities (lower case). */
@@ -168,7 +209,7 @@ class relay_tracking extends rcube_plugin
             return $args;
         }
         $headers = (array) $message->headers();
-        $mid = trim((string) ($headers['Message-ID'] ?? ''));
+        $mid = self::message_id($headers['Message-ID'] ?? '');
         $from = (string) ($args['from'] ?? '');
         if ($from === '') {
             $list = rcube_mime::decode_address_list((string) ($headers['From'] ?? ''), 1, true, null, true);
@@ -177,9 +218,6 @@ class relay_tracking extends rcube_plugin
         $relay = $this->relay_for_domain(self::domain_of($from));
         if ($mid === '' || !$relay || empty($this->relays()[$relay]['headers'])) {
             return $args;
-        }
-        if ($mid[0] !== '<') {
-            $mid = '<' . $mid . '>';
         }
         // safe inside the JSON some relays expect (Mailgun, SendGrid)
         $mid = preg_replace('/[\x00-\x1f"\\\\]/', '', $mid);
@@ -207,18 +245,22 @@ class relay_tracking extends rcube_plugin
         $h = $msg->headers;
         $from = rcube_mime::decode_address_list((string) $h->from, 1, true, $h->charset, true);
         $from = strtolower((string) (reset($from) ?: ''));   // list indexed from 1 (rcube_mime)
+        if (!in_array($from, $this->my_emails(), true)) {
+            return $p;   // not a mail we sent
+        }
         $relay = $this->relay_for_domain(self::domain_of($from));
-        if (!$relay || !in_array($from, $this->my_emails(), true)) {
-            return $p;   // not a mail we sent through a tracked relay
+        $mid = self::message_id($h->messageID);
+        $self = $this->self_events($mid);
+        if (!$relay && $self === null) {
+            return $p;   // neither sent through a tracked relay nor tracked by Roundcube
         }
 
-        $mid = trim((string) $h->messageID);
-        if ($mid !== '' && $mid[0] !== '<') {
-            $mid = '<' . $mid . '>';
+        $events = [];
+        if ($relay) {
+            $file = $this->dir() . '/' . $relay . '/events.json';
+            $events = is_readable($file) ? json_decode((string) file_get_contents($file), true) : null;
+            $events = is_array($events) ? $events : [];
         }
-        $file = $this->dir() . '/' . $relay . '/events.json';
-        $events = is_readable($file) ? json_decode((string) file_get_contents($file), true) : null;
-        $events = is_array($events) ? $events : [];
         $per = (array) ($events['messages'][$mid] ?? []);
 
         // recipients of the message (To, Cc, Bcc) + those that appear in the events
@@ -234,6 +276,26 @@ class relay_tracking extends rcube_plugin
         foreach (array_keys($per) as $addr) {
             $rcpts[strtolower($addr)] = true;
         }
+        // Roundcube's own pixel and links: one body for all recipients, so the hits belong to none in particular
+        if ($self !== null) {
+            // the relay has its own "sent"
+            $all = array_merge($all, $relay ? array_values(array_filter($self, function ($ev) {
+                return $ev[1] !== 'sent';
+            })) : $self);
+        }
+        $rcpts = array_values(array_filter(array_keys($rcpts), function ($addr) {
+            return rcube_utils::check_email($addr, false);
+        }));
+        // without a relay, all the events are Roundcube's: one row for all the recipients
+        $rows = [];
+        if ($relay) {
+            foreach ($rcpts as $addr) {
+                $rows[$addr] = array_merge($all, (array) ($per[$addr] ?? []));
+            }
+        }
+        else if ($rcpts) {
+            $rows[implode(', ', $rcpts)] = $all;
+        }
 
         // user preferences: IP addresses, who they belong to, where they are
         $show_ip = (bool) $this->rc->config->get('relay_tracking_show_ip', true);
@@ -242,32 +304,34 @@ class relay_tracking extends rcube_plugin
 
         $out = [];
         $hosts = [];   // reverse DNS / provider of the IPs this mail's events carry (only those)
-        foreach (array_keys($rcpts) as $addr) {
-            if (rcube_utils::check_email($addr, false)) {
-                $list = array_values(array_merge($all, (array) ($per[$addr] ?? [])));
-                if (!$show_ip) {
-                    $list = array_map(function ($ev) { return array_slice((array) $ev, 0, 3); }, $list);
-                }
-                foreach ($list as $ev) {
-                    $ip = (string) ($ev[3] ?? '');
-                    if ($ip === '' || !isset($events['hosts'][$ip]) || !is_array($events['hosts'][$ip])) {
-                        continue;
-                    }
-                    $host = $events['hosts'][$ip];
-                    $hosts[$ip] = [];
-                    if ($show_owner) {
-                        $hosts[$ip]['rdns'] = (string) ($host['rdns'] ?? '');
-                        $hosts[$ip]['provider'] = (string) ($host['provider'] ?? '');
-                    }
-                    if ($show_location) {
-                        // "City, Region, CC" without the empty or repeated parts (Zurich, Zurich, CH > Zurich, CH)
-                        $parts = array_values(array_unique(array_filter([(string) ($host['city'] ?? ''),
-                            (string) ($host['region'] ?? ''), (string) ($host['country'] ?? '')], 'strlen')));
-                        $hosts[$ip]['location'] = implode(', ', $parts);
-                    }
-                }
-                $out[] = ['email' => $addr, 'events' => $list];
+        foreach ($rows as $addr => $list) {
+            $list = array_values($list);
+            // events without a recipient (and Roundcube's hits) among the recipient's own: back in date order
+            usort($list, function ($a, $b) {
+                return strtotime((string) ($a[0] ?? '')) <=> strtotime((string) ($b[0] ?? ''));
+            });
+            if (!$show_ip) {
+                $list = array_map(function ($ev) { return array_slice((array) $ev, 0, 3); }, $list);
             }
+            foreach ($list as $ev) {
+                $ip = (string) ($ev[3] ?? '');
+                if ($ip === '' || !isset($events['hosts'][$ip]) || !is_array($events['hosts'][$ip])) {
+                    continue;
+                }
+                $host = $events['hosts'][$ip];
+                $hosts[$ip] = [];
+                if ($show_owner) {
+                    $hosts[$ip]['rdns'] = (string) ($host['rdns'] ?? '');
+                    $hosts[$ip]['provider'] = (string) ($host['provider'] ?? '');
+                }
+                if ($show_location) {
+                    // "City, Region, CC" without the empty or repeated parts (Zurich, Zurich, CH > Zurich, CH)
+                    $parts = array_values(array_unique(array_filter([(string) ($host['city'] ?? ''),
+                        (string) ($host['region'] ?? ''), (string) ($host['country'] ?? '')], 'strlen')));
+                    $hosts[$ip]['location'] = implode(', ', $parts);
+                }
+            }
+            $out[] = ['email' => (string) $addr, 'events' => $list];
         }
 
         $days = (int) ($events['days'] ?? 30);
@@ -295,8 +359,10 @@ class relay_tracking extends rcube_plugin
         }
 
         $this->rc->output->set_env('relay_tracking_msg', [
-            'name' => $this->relays()[$relay]['name'],
-            'lag' => $this->relays()[$relay]['lag'],
+            'name' => $relay ? $this->relays()[$relay]['name'] : 'Roundcube',
+            'lag' => $relay ? $this->relays()[$relay]['lag'] : '',
+            // Roundcube's pixel and links only: no delivery information, one row for all the recipients
+            'self_only' => !$relay,
             'recipients' => $out,
             'hosts' => (object) $hosts,
             'dates' => (object) $dates,
@@ -312,27 +378,245 @@ class relay_tracking extends rcube_plugin
         return $p;
     }
 
-    // ------------------------------------------------------------------ preferences
+    // ------------------------------------------------------------------ self tracking
 
-    private const PREFS = ['relay_tracking_show_ip', 'relay_tracking_show_owner', 'relay_tracking_show_location'];
-
-    /** preferences_list hook: "Delivery tracking" block in Displaying Messages, for users with a tracked relay */
-    public function preferences_list($args)
+    private function self_enabled()
     {
-        if ($args['section'] != 'mailview') {
+        return (bool) $this->rc->config->get('relay_tracking_self', false);
+    }
+
+    private function table($name)
+    {
+        return $this->rc->get_dbh()->table_name($name, true);
+    }
+
+    /** Whether the user can choose per mail (compose checkbox), or the admin decided for everyone. */
+    private function self_locked()
+    {
+        return in_array('relay_tracking_self_track', (array) $this->rc->config->get('dont_override', []), true);
+    }
+
+    /** Absolute URL of the open pixel or of a tracked link (relay_tracking_self_url when Roundcube sits behind a proxy). */
+    private function self_url($action, $token, $link = null)
+    {
+        $p = ['_task' => 'relay_tracking', '_action' => $action, '_t' => $token];
+        if ($link !== null) {
+            $p['_l'] = $link;
+        }
+        $base = trim((string) $this->rc->config->get('relay_tracking_self_url', ''));
+        return $base === '' ? $this->rc->url($p, true, true) : rtrim($base, '/') . '/?' . http_build_query($p);
+    }
+
+    /** compose: "Track opens and clicks" checkbox in the options, ticked per the user's preference. */
+    private function compose_option()
+    {
+        if (!$this->self_enabled() || $this->self_locked()) {
+            return;
+        }
+        $this->add_texts('localization/');
+        $id = 'compose-relay-tracking';
+        $check = new html_checkbox(['name' => '_relay_tracking_self', 'id' => $id, 'value' => 1,
+            'class' => 'form-check-input', 'tabindex' => 2]);
+        $this->api->add_content(html::div('form-group row form-check',
+            html::label(['for' => $id, 'class' => 'col-form-label col-6'], rcube::Q($this->gettext('compose_self')))
+            . html::div('col-6 form-check', $check->show($this->rc->config->get('relay_tracking_self_track', true) ? 1 : 0))
+        ), 'composeoptions');
+    }
+
+    /**
+     * message_before_send hook: open pixel at the end of the HTML part and its http(s) links through Roundcube, when
+     * tracking is ticked for this mail. Mail without an HTML part is left as it is.
+     */
+    public function self_track($args)
+    {
+        $message = $args['message'] ?? null;
+        if (!$this->self_enabled() || !is_object($message) || !method_exists($message, 'getHTMLBody')) {
             return $args;
         }
+        $on = $this->self_locked() ? $this->rc->config->get('relay_tracking_self_track', true)
+            : rcube_utils::get_input_value('_relay_tracking_self', rcube_utils::INPUT_POST);
+        $html = (string) $message->getHTMLBody();
+        $mid = self::message_id(((array) $message->headers())['Message-ID'] ?? '');
+        if (empty($on) || $html === '' || $mid === '' || strlen($mid) > 255 || empty($this->rc->user->ID)) {
+            return $args;
+        }
+
+        $this->self_cleanup();
+        $token = bin2hex(random_bytes(16));
+        $links = [];
+        $html = preg_replace_callback('/(<a\b[^>]*?\shref\s*=\s*)(["\'])(https?:\/\/[^"\']+)\2/i',
+            function ($m) use (&$links, $token) {
+                $url = html_entity_decode($m[3], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                // kept as it is: anything that could not be sent back as a Location header
+                if (strlen($url) > 2048 || preg_match('/[\x00-\x20\x7f]/', $url)) {
+                    return $m[0];
+                }
+                $links[] = $url;
+                return $m[1] . $m[2] . htmlspecialchars($this->self_url('click', $token, count($links) - 1)) . $m[2];
+            }, $html);
+        $pixel = '<img src="' . htmlspecialchars($this->self_url('open', $token)) . '" width="1" height="1" alt=""'
+            . ' style="display:block;width:1px;height:1px;border:0">';
+        $end = strripos($html, '</body>');
+        $html = $end === false ? $html . $pixel : substr_replace($html, $pixel, $end, 0);
+
+        $db = $this->rc->get_dbh();
+        $db->query('INSERT INTO ' . $this->table('relay_tracking_mail')
+            . ' (token, user_id, message_id, links, created) VALUES (?, ?, ?, ?, ?)',
+            $token, $this->rc->user->ID, $mid, json_encode($links, JSON_UNESCAPED_SLASHES), gmdate('Y-m-d H:i:s'));
+        if ($db->is_error()) {
+            return $args;   // not recorded: sent untracked rather than with links nobody can follow
+        }
+        $message->setHTMLBody($html);
+        $args['message'] = $message;
+        return $args;
+    }
+
+    /** Tracking older than relay_tracking_self_days is dropped (done when sending, the only time rows are added). */
+    private function self_cleanup()
+    {
+        $days = (int) $this->rc->config->get('relay_tracking_self_days', 90);
+        if ($days <= 0) {
+            return;
+        }
+        $db = $this->rc->get_dbh();
+        $before = gmdate('Y-m-d H:i:s', time() - $days * 86400);
+        $mail = $this->table('relay_tracking_mail');
+        $db->query('DELETE FROM ' . $this->table('relay_tracking_hit')
+            . " WHERE token IN (SELECT token FROM $mail WHERE created < ?)", $before);
+        $db->query("DELETE FROM $mail WHERE created < ?", $before);
+    }
+
+    /**
+     * startup hook for ?_task=relay_tracking: records an open (_action=open) or a click (_action=click, _l = link
+     * number) and answers with the pixel or a redirect. Only links stored when sending are followed, so it is no open
+     * redirect. Requests from the sender's own session (their Sent copy) are not recorded.
+     */
+    public function self_hit($args)
+    {
         $this->load_config();
-        if (!$this->relays()) {
+        $action = (string) rcube_utils::get_input_string('_action', rcube_utils::INPUT_GET);
+        $token = (string) rcube_utils::get_input_string('_t', rcube_utils::INPUT_GET);
+        $db = $this->rc->get_dbh();
+
+        $row = null;
+        if ($this->self_enabled() && preg_match('/^[0-9a-f]{32}$/', $token)) {
+            $res = $db->query('SELECT user_id, links, created FROM ' . $this->table('relay_tracking_mail')
+                . ' WHERE token = ?', $token);
+            $row = $db->fetch_assoc($res) ?: null;
+        }
+        $url = null;
+        if ($row && $action == 'click') {
+            $links = json_decode((string) $row['links'], true);
+            $l = (string) rcube_utils::get_input_string('_l', rcube_utils::INPUT_GET);
+            if (ctype_digit($l) && is_array($links) && is_string($links[(int) $l] ?? null)) {
+                $url = $links[(int) $l];
+            }
+        }
+
+        if ($row && ($action == 'open' || $url !== null) && (int) $row['user_id'] !== (int) $this->rc->get_user_id()) {
+            $res = $db->query('SELECT COUNT(*) AS n FROM ' . $this->table('relay_tracking_hit') . ' WHERE token = ?', $token);
+            if ((int) (($db->fetch_assoc($res) ?: [])['n'] ?? 0) < self::SELF_MAX_HITS) {
+                $type = 'clicked';
+                if ($action == 'open') {
+                    $age = time() - (int) strtotime($row['created'] . ' UTC');
+                    $auto = $age < self::SELF_AUTO_OPEN || preg_match(self::SELF_AUTO_UA, (string) ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+                    $type = $auto ? 'proxy_open' : 'opened';
+                }
+                $db->query('INSERT INTO ' . $this->table('relay_tracking_hit')
+                    . ' (token, created, type, extra, ip) VALUES (?, ?, ?, ?, ?)',
+                    $token, gmdate('Y-m-d H:i:s'), $type, $url,
+                    $this->rc->config->get('relay_tracking_self_ip', false) ? rcube_utils::remote_addr() : null);
+            }
+        }
+
+        // no session row for each recipient's request
+        if (session_status() == PHP_SESSION_ACTIVE) {
+            session_abort();
+        }
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Referrer-Policy: no-referrer');
+        if ($action == 'click') {
+            if ($url === null) {
+                http_response_code(404);
+                header('Content-Type: text/plain; charset=UTF-8');
+                echo "Not found\n";
+            }
+            else {
+                header('Location: ' . $url, true, 302);
+            }
+        }
+        else {
+            header('Content-Type: image/gif');
+            echo base64_decode(self::PIXEL);
+        }
+        exit;
+    }
+
+    /**
+     * Roundcube's own tracking of a sent mail as common format events (sent, then each hit in date order), or null
+     * when it was not tracked.
+     */
+    private function self_events($mid)
+    {
+        if (!$this->self_enabled() || $mid === '') {
+            return null;
+        }
+        $db = $this->rc->get_dbh();
+        $res = $db->query('SELECT token, created FROM ' . $this->table('relay_tracking_mail')
+            . ' WHERE user_id = ? AND message_id = ?', $this->rc->user->ID, $mid);
+        $mail = $db->fetch_assoc($res);
+        if (!$mail) {
+            return null;
+        }
+        $iso = function ($date) { return gmdate('Y-m-d\TH:i:s\Z', (int) strtotime($date . ' UTC')); };
+        $events = [[$iso($mail['created']), 'sent']];
+        $res = $db->query('SELECT created, type, extra, ip FROM ' . $this->table('relay_tracking_hit')
+            . ' WHERE token = ? ORDER BY created, hit_id', $mail['token']);
+        while ($hit = $db->fetch_assoc($res)) {
+            $ev = [$iso($hit['created']), (string) $hit['type'], (string) $hit['extra']];
+            if ((string) $hit['ip'] !== '') {
+                $ev[] = (string) $hit['ip'];
+            }
+            $events[] = $ev;
+        }
+        return $events;
+    }
+
+    // ------------------------------------------------------------------ preferences
+
+    private const PREFS = [
+        'mailview' => ['relay_tracking_show_ip', 'relay_tracking_show_owner', 'relay_tracking_show_location'],
+        'compose' => ['relay_tracking_self_track'],
+    ];
+
+    /** Preferences of a section the user has a use for: the box's (a tracked relay or self tracking), self tracking's. */
+    private function prefs($section)
+    {
+        $this->load_config();
+        if (empty(self::PREFS[$section]) || !($section == 'compose' ? $this->self_enabled()
+            : $this->relays() || $this->self_enabled())) {
+            return [];
+        }
+        $locked = (array) $this->rc->config->get('dont_override', []);
+        return array_values(array_diff(self::PREFS[$section], $locked));
+    }
+
+    /**
+     * preferences_list hook: "Delivery tracking" block in Displaying Messages (what the box shows) and in Composing
+     * Messages (self tracking ticked by default)
+     */
+    public function preferences_list($args)
+    {
+        $prefs = $this->prefs($args['section']);
+        if (!$prefs) {
             return $args;
         }
         $this->add_texts('localization/');
-        $locked = (array) $this->rc->config->get('dont_override', []);
         $options = [];
-        foreach (self::PREFS as $pref) {
-            if (in_array($pref, $locked, true)) {
-                continue;
-            }
+        foreach ($prefs as $pref) {
             $id = 'rcmfd_' . $pref;
             $check = new html_checkbox(['name' => '_' . $pref, 'id' => $id, 'value' => 1]);
             $options[$pref] = [
@@ -340,23 +624,15 @@ class relay_tracking extends rcube_plugin
                 'content' => $check->show($this->rc->config->get($pref, true) ? 1 : 0),
             ];
         }
-        if ($options) {
-            $args['blocks']['relay_tracking'] = ['name' => rcube::Q($this->gettext('pref_block')), 'options' => $options];
-        }
+        $args['blocks']['relay_tracking'] = ['name' => rcube::Q($this->gettext('pref_block')), 'options' => $options];
         return $args;
     }
 
     /** preferences_save hook */
     public function preferences_save($args)
     {
-        if ($args['section'] != 'mailview') {
-            return $args;
-        }
-        $locked = (array) $this->rc->config->get('dont_override', []);
-        foreach (self::PREFS as $pref) {
-            if (!in_array($pref, $locked, true)) {
-                $args['prefs'][$pref] = !empty(rcube_utils::get_input_value('_' . $pref, rcube_utils::INPUT_POST));
-            }
+        foreach ($this->prefs($args['section']) as $pref) {
+            $args['prefs'][$pref] = !empty(rcube_utils::get_input_value('_' . $pref, rcube_utils::INPUT_POST));
         }
         return $args;
     }

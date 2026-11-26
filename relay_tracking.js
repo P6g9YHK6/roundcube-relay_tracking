@@ -2,7 +2,7 @@
  * relay_tracking
  *
  * Tracking box of a sent mail. No key and no call to the relay here: the data comes from the cache written by the
- * server's collector (see relay_tracking.php).
+ * server's collector, or from Roundcube's own open pixel and links (see relay_tracking.php).
  *
  * Event types = common format v1 vocabulary (README.md): sent, delivered, deferred, soft_bounce, hard_bounce, blocked,
  * invalid, error, opened, proxy_open, clicked, spam, unsubscribed.
@@ -139,8 +139,9 @@
     }
 
     // Progress of one recipient: Sent > Delivered > Opened > Clicked. A problem before delivery takes the Delivered
-    // step (red); a later one (spam complaint, unsubscribe...) is added as a red step at the end.
-    function stepper(a) {
+    // step (red); a later one (spam complaint, unsubscribe...) is added as a red step at the end. Without delivery
+    // information (Roundcube's own tracking only): Sent > Opened > Clicked.
+    function stepper(a, no_delivery) {
         var ol = el('ol', 'rt-stepper'), stop = false, early = !a.delivered && a.problems.length ? a.problems[0] : null;
 
         function step(state, name, meta, title) {
@@ -157,7 +158,10 @@
         }
 
         step(a.sent || a.delivered ? 'done' : 'todo', label('ev_sent'), a.sent ? fmt(a.sent) : '');
-        if (early) {
+        if (no_delivery) {
+            // no Delivered step
+        }
+        else if (early) {
             step('bad', label('ev_' + early.k), fmt(early.d), early.detail || null);
             stop = true;
         }
@@ -230,7 +234,8 @@
             return;
         }
 
-        var rcpts = data.recipients || [], n = rcpts.length, delivered = 0, opened = 0, clicks = 0, issues = 0, auto = false;
+        var rcpts = data.recipients || [], n = rcpts.length, delivered = 0, opened = 0, opens = 0, clicks = 0, issues = 0,
+            auto = false;
         var box = el('section', 'rt-box'), head = el('button', 'rt-head'), body = el('div', 'rt-body');
         box.id = 'rt-track';
         box.setAttribute('aria-label', fill(label('track'), { relay: data.name }));
@@ -241,6 +246,7 @@
             var a = analyse(r.events || []), row = el('div', 'rt-rcpt');
             if (a.delivered) delivered++;
             if (a.opens) opened++;
+            opens += a.opens;
             if (a.auto_opens) auto = true;
             clicks += a.clicks;
             if (a.problems.length) issues++;
@@ -255,7 +261,7 @@
                 return;
             }
 
-            row.appendChild(stepper(a));
+            row.appendChild(stepper(a, data.self_only));
 
             // full timeline, folded unless something went wrong
             var toggle = el('button', 'rt-toggle', label('timeline') + ' (' + a.rows.length + ')'), table = timeline(a, data.hosts || {});
@@ -277,6 +283,11 @@
                 : data.untracked ? fill(label('untracked'), { relay: data.name })
                 : fill(label('waiting'), { relay: data.name }) + (data.lag ? ' ' + fill(label('waiting_lag'), { lag: data.lag }) : '');
         }
+        else if (data.self_only) {
+            // one row for all the recipients: opens are counted, not the recipients who opened
+            summary = (opens ? fill(label('sum_opens'), { n: opens }) : label('sum_not_opened'))
+                + (clicks ? ' · ' + clicks + ' ' + label(clicks > 1 ? 'ev_clicks' : 'ev_click') : '');
+        }
         else {
             summary = fill(label('sum_delivered'), { n: delivered, t: n })
                 + (opened ? ' · ' + fill(label('sum_opened'), { n: opened }) : '')
@@ -291,6 +302,9 @@
         if (data.known) {
             if (auto) {
                 body.appendChild(el('p', 'rt-note', '* ' + label('auto_open')));
+            }
+            if (data.self_only) {
+                body.appendChild(el('p', 'rt-note', label('self_note')));
             }
             // DB-IP Lite data is CC BY 4.0: credit it wherever a location is shown
             if (Object.keys(data.hosts || {}).some(function (ip) { return data.hosts[ip].location; })) {
