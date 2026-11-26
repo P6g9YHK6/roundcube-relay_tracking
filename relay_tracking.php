@@ -11,6 +11,7 @@
  *
  *   <relay_tracking_dir>/<relay>/relay.json    description: name, domains served, capabilities, publication delay
  *   <relay_tracking_dir>/<relay>/events.json   events by Message-ID, then by recipient (normalised types)
+ *   <relay_tracking_dir>/<relay>/archive/      events older than events.json's window, one file per Message-ID hash
  *
  * When viewing a SENT mail from an identity on a relay's domain, a "Delivery tracking" box shows each recipient's
  * events, with the IP address on hover when the collector includes it (off by default).
@@ -65,7 +66,7 @@ class relay_tracking extends rcube_plugin
         return [
             'name' => 'relay_tracking',
             'vendor' => 'p6g9yhk6',
-            'version' => '2.6.1',
+            'version' => '2.7.0',
             'license' => 'GPL-3.0-or-later',
             'uri' => 'https://github.com/P6g9YHK6/roundcube-relay_tracking',
         ];
@@ -262,6 +263,14 @@ class relay_tracking extends rcube_plugin
             $events = is_array($events) ? $events : [];
         }
         $per = (array) ($events['messages'][$mid] ?? []);
+        // events the relay no longer has, kept by the collector: before the window's, and their IPs' hosts
+        if ($relay && !empty($events['archive'])) {
+            $old_hosts = [];
+            foreach ($this->archived($relay, $mid, $old_hosts) as $addr => $list) {
+                $per[$addr] = array_merge($list, (array) ($per[$addr] ?? []));
+            }
+            $events['hosts'] = (array) ($events['hosts'] ?? []) + $old_hosts;
+        }
 
         // recipients of the message (To, Cc, Bcc) + those that appear in the events
         $rcpts = [];
@@ -336,9 +345,10 @@ class relay_tracking extends rcube_plugin
 
         $days = (int) ($events['days'] ?? 30);
         $generated = (int) ($events['generated'] ?? 0);
-        // start of the window the collector covers: "since" when it had to stop paging before the end of the
-        // window (too many events), otherwise the full "days" window
-        $since = max((int) ($events['since'] ?? 0), $generated - $days * 86400);
+        // start of what the collector covers: with an archive, "since"; otherwise "since" when it had to stop paging
+        // before the end of the window (too many events), else the full "days" window
+        $since = !empty($events['archive']) ? (int) ($events['since'] ?? 0)
+            : max((int) ($events['since'] ?? 0), $generated - $days * 86400);
         $wait = (int) $this->rc->config->get('relay_tracking_untracked_after', 86400);
         $none = empty($per) && empty($all);
         $expired = $none && $h->timestamp && $h->timestamp < $since;
@@ -376,6 +386,51 @@ class relay_tracking extends rcube_plugin
         $this->add_texts('localization/', true);
 
         return $p;
+    }
+
+    /**
+     * Archived events of a mail: archive/<first 2 hex digits of md5(Message-ID)>.jsonl, one event per line
+     * ({m, e, d, t, l, r, i, h?: host of i}). By recipient in the events.json form ([date, type, extra?, ip?]), the
+     * hosts added to $hosts. Repeated lines are skipped.
+     */
+    private function archived($relay, $mid, &$hosts)
+    {
+        $per = [];
+        $file = $this->dir() . '/' . $relay . '/archive/' . substr(md5($mid), 0, 2) . '.jsonl';
+        $fh = $mid !== '' && is_readable($file) ? fopen($file, 'r') : false;
+        if (!$fh) {
+            return $per;
+        }
+        // the collector writes "m" first: only lines naming this Message-ID are decoded
+        $needle = '{"m":' . json_encode($mid, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ',';
+        $seen = [];
+        while (($line = fgets($fh)) !== false) {
+            $line = trim($line);
+            if (strpos($line, $needle) !== 0 || isset($seen[$line])) {
+                continue;
+            }
+            $seen[$line] = true;
+            $ev = json_decode($line, true);
+            if (!is_array($ev) || ($ev['m'] ?? '') !== $mid) {
+                continue;
+            }
+            $link = (string) ($ev['l'] ?? '');
+            $reason = (string) ($ev['r'] ?? '');
+            $ip = (string) ($ev['i'] ?? '');
+            $item = [(string) ($ev['d'] ?? ''), (string) ($ev['t'] ?? '')];
+            if ($ip !== '') {
+                array_push($item, $link !== '' ? $link : $reason, $ip);
+                if (is_array($ev['h'] ?? null)) {
+                    $hosts[$ip] = $ev['h'];
+                }
+            }
+            else if ($link !== '' || $reason !== '') {
+                $item[] = $link !== '' ? $link : $reason;
+            }
+            $per[strtolower((string) ($ev['e'] ?? ''))][] = $item;
+        }
+        fclose($fh);
+        return $per;
     }
 
     // ------------------------------------------------------------------ self tracking

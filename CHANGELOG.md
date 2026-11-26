@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.7.0 (2026-11-26)
+
+- Events are kept after the relay drops them (Brevo: 90 days, most others 30). Every relay now keeps its events
+  between runs, as Mailgun, SMTP2GO, MailerSend and SES already did, so the window no longer depends on what the relay
+  still returns; events older than the window move to `archive/` in the relay's data folder, one file per Message-ID
+  hash, with the owner and location of their IP. Kept forever by default; `KEEP_DAYS` limits it.
+- `events.json` has `archive: true` and `since`, the start of all the data: mails sent before the collector first ran
+  show "history unavailable", the others their whole history.
+- The driver setting `R_KEEP` is gone (every relay keeps its events now).
+
 ## 2.6.1 (2026-11-26)
 
 - Lettermint: events without data (queued, processed) come with `metadata: []`, an empty list, which stopped the

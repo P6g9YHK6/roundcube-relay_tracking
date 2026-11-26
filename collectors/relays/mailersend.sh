@@ -22,7 +22,6 @@ R_NAME="MailerSend"
 R_CAPS='["events", "opens", "clicks"]'
 R_DAYS=30                      # depends on the plan's data retention
 R_LAG="a few minutes"
-R_KEEP=1
 API="https://api.mailersend.com/v1"
 MS_WAIT=6                      # seconds between activity requests (10 per minute)
 

@@ -14,7 +14,6 @@ R_NAME="SMTP2GO"
 R_CAPS='["events", "opens", "clicks"]'
 R_DAYS=30                      # reporting window (5 days on the free plan without extended reporting)
 R_LAG="a few minutes"
-R_KEEP=1
 API="${SMTP2GO_API:-https://api.smtp2go.com/v3}"
 
 r_auth(){ cfg_header "X-Smtp2go-Api-Key: $KEY"; }

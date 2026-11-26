@@ -10,7 +10,9 @@
 #  The settings file names the relay (RELAY=brevo, postmark, mailgun...), whose driver in relays/<RELAY>.sh fetches
 #  the events and maps them to the common vocabulary. This script does the rest, the same for every relay:
 #  relay.json (name, domains, capabilities, headers to add when sending), which is what enables the plugin for those
-#  domains, and events.json, the events of the last EVENT_DAYS days grouped by Message-ID then by recipient. IP
+#  domains, and events.json, the events of the last EVENT_DAYS days grouped by Message-ID then by recipient. Events
+#  leaving that window are appended to archive/, one file per Message-ID hash, and kept KEEP_DAYS (default: forever),
+#  so a mail keeps its history after the relay has dropped it. IP
 #  addresses only with INCLUDE_IP=1 (personal data of the recipients: off by default); then each IP's network owner
 #  (IP_ASN=1, default) and location (IP_GEO=1) from DB-IP Lite data searched locally, and with IP_LOOKUP=1 its
 #  reverse DNS name, cached 30 days.
@@ -32,8 +34,8 @@
 #    R_DAYS     longest window the relay keeps       R_LAG      publication delay shown while a mail is pending
 #    R_HEADERS  JSON object of headers the plugin adds to each mail sent through the relay, "{message_id}" replaced
 #               by its Message-ID (for relays that do not return the Message-ID); {} when none
-#    R_KEEP     1 = events are accumulated in STATE_DIR between runs (relays that only give what changed lately);
-#               r_fetch then only needs the events since $FROM, and may set CURSOR (epoch) when it stopped before now
+#    Events are accumulated in STATE_DIR between runs, so r_fetch of a relay that only gives what changed lately may
+#    read only the events since $FROM, and set CURSOR (epoch) when it stopped before now
 #    r_auth     writes the curl settings (key) with cfg_header / cfg_user / cfg_line
 #    r_fetch    appends the events to $EV, one JSON object per line:
 #                 {m: Message-ID with <>, f: sender (or ""), e: recipient (or "*" for all), d: date (ISO 8601 or
@@ -70,12 +72,15 @@ IP_GEO="${IP_GEO:-0}"                         # 1 = location of each IP from DB-
 GEO_URL="${GEO_URL:-https://raw.githubusercontent.com/P6g9YHK6/roundcube-relay_tracking/geoip}"
 DRY="${DRY_RUN:-0}"
 
-R_HEADERS='{}'; R_KEEP=0; R_LAG="a few minutes"
+R_HEADERS='{}'; R_LAG="a few minutes"
 # shellcheck source=/dev/null
 . "$DRIVER"
 EVENT_DAYS="${EVENT_DAYS:-$R_DAYS}"
 [ "$EVENT_DAYS" -gt "$R_DAYS" ] 2>/dev/null && EVENT_DAYS=$R_DAYS
 [ -n "${LAG:-}" ] || LAG="$R_LAG"
+KEEP_DAYS="${KEEP_DAYS:-0}"                   # days archived events are kept, 0 = forever (at least EVENT_DAYS)
+[[ "$KEEP_DAYS" =~ ^[0-9]+$ ]] || { echo "KEEP_DAYS must be a number of days (0: forever)" >&2; exit 1; }
+[ "$KEEP_DAYS" -gt 0 ] && [ "$KEEP_DAYS" -lt "$EVENT_DAYS" ] && KEEP_DAYS=$EVENT_DAYS
 
 install -d -m 0700 "$STATE_DIR" || exit 1
 exec 9>"$STATE_DIR/.lock"
@@ -196,25 +201,45 @@ if [ "$EV_OK" = "1" ]; then
     | {m: (.m // ""), f: (.f // "" | ascii_downcase), e: (.e // "" | ascii_downcase), s: $s, d: ($s | todate),
        t, l: (.l // ""), r: (.r // "" | tostring | .[:500]), i: (.i // "")}' "$EV" > "$WORK/ev.norm" || EV_OK=0
 fi
-if [ "$EV_OK" = "1" ] && [ "$R_KEEP" = "1" ]; then
-  # events of the earlier runs, still in the window
-  [ -f "$DATA/events.jsonl" ] && jq -c --argjson start "$WINDOW_START" 'select(.s >= $start)' "$DATA/events.jsonl" >> "$WORK/ev.norm"
-  sort -u "$WORK/ev.norm" > "$WORK/ev.keep" && cp "$WORK/ev.keep" "$WORK/ev.norm"
-fi
 if [ "$EV_OK" = "1" ]; then
-  # [date, type] + link (click) or reason (bounce), + IP when kept (extra is then "" if none); our sender domains
-  # only (events without sender are kept); events without a usable recipient dropped
-  jq -s --argjson gen "$NOW" --argjson days "$EVENT_DAYS" --argjson since "$SINCE" --argjson doms "$DOMAINS_JSON" \
-     --argjson ip "$( [ "$INCLUDE_IP" = 1 ] && echo true || echo false )" \
-    '{generated: $gen, days: $days} + (if $since > 0 then {since: $since} else {} end) + {
-      messages: ( unique | map(select(.m != "" and (.e == "*" or (.e | test("@"))) and (.f == "" or (.f | '"$OURS"')))
-          | if $ip then . else .i = "" end)
+  # events of the earlier runs: what the relay no longer returns is kept, and this run's copy of an event (same
+  # message, recipient, date, type and link) replaces the earlier one. Those now older than the window go to the archive
+  key='([.m, .e, .s, .t, .l] | tojson) + "\t" + tojson'
+  jq -r "$key" "$WORK/ev.norm" > "$WORK/ev.new.k" || EV_OK=0
+  : > "$WORK/ev.prev.k"
+  if [ -f "$DATA/events.jsonl" ] && ! jq -r "$key" "$DATA/events.jsonl" > "$WORK/ev.prev.k"; then
+    log "stored events unreadable: $DATA/events.jsonl"; EV_OK=0
+  fi
+  awk -F'\t' 'FILENAME == ARGV[1] { k[$1] = 1; print $2; next } !($1 in k) { print $2 }' "$WORK/ev.new.k" "$WORK/ev.prev.k" \
+    | sort -u > "$WORK/ev.merged" || EV_OK=0
+  jq -c --argjson start "$WINDOW_START" 'select(.s >= $start)' "$WORK/ev.merged" > "$WORK/ev.norm" \
+    && jq -c --argjson start "$WINDOW_START" 'select(.s < $start)' "$WORK/ev.merged" > "$WORK/ev.old" || EV_OK=0
+fi
+# oldest date the events cover: the first run's window (or where the relay stopped), earlier when EVENT_DAYS grows,
+# later only when KEEP_DAYS drops what is older
+START=$WINDOW_START; [ "$SINCE" -gt "$START" ] && START=$SINCE
+[ -s "$DATA/start" ] && read -r prev < "$DATA/start" && [ "$prev" -lt "$START" ] 2>/dev/null && START=$prev
+[ "$KEEP_DAYS" -gt 0 ] && [ $(( NOW - KEEP_DAYS * 86400 )) -gt "$START" ] && START=$(( NOW - KEEP_DAYS * 86400 ))
+# our sender domains only (events without sender are kept), events without a usable recipient dropped, IP only when kept
+MINE='select(.m != "" and (.e == "*" or (.e | test("@"))) and (.f == "" or (.f | '"$OURS"'))) | if $ip then . else .i = "" end'
+IP_JSON=$( [ "$INCLUDE_IP" = 1 ] && echo true || echo false )
+if [ "$EV_OK" = "1" ]; then
+  # [date, type] + link (click) or reason (bounce), + IP when kept (extra is then "" if none)
+  jq -s --argjson gen "$NOW" --argjson days "$EVENT_DAYS" --argjson since "$START" --argjson doms "$DOMAINS_JSON" \
+     --argjson ip "$IP_JSON" \
+    '{generated: $gen, days: $days, since: $since, archive: true} + {
+      messages: ( unique | map('"$MINE"')
         | group_by(.m) | map({key: .[0].m, value:
             ( group_by(.e) | map({key: .[0].e, value:
                 ( sort_by(.s) | map([.d, .t] + (if .i != "" then [(if .l != "" then .l else .r end), .i]
                                   elif .l != "" then [.l] elif .r != "" then [.r] else [] end)) )})
               | from_entries )})
         | from_entries )}' "$WORK/ev.norm" > "$WORK/events.json" || EV_OK=0
+fi
+if [ "$EV_OK" = "1" ]; then
+  # events leaving the window, as archived: {m, e, d, t, l, r, i} (+ h, the IP's host, added when written)
+  jq -c --argjson doms "$DOMAINS_JSON" --argjson ip "$IP_JSON" "$MINE"' | {m, e, d, t, l, r, i}' "$WORK/ev.old" \
+    > "$WORK/ev.arch" || EV_OK=0
 fi
 
 # ------------------------------------------------------------------ IP identification
@@ -295,8 +320,8 @@ local_lookup(){
 }
 
 if [ "$EV_OK" = "1" ] && [ "$INCLUDE_IP" = "1" ] && { [ "$IP_LOOKUP" = "1" ] || [ "$IP_GEO" = "1" ] || [ "$IP_ASN" = "1" ]; }; then
-  jq -r '[.messages[][][] | select(length == 4) | .[3]] | unique | .[] | select(test("^[0-9a-fA-F.:]+$"))' \
-    "$WORK/events.json" > "$WORK/ips"
+  { jq -r '.messages[][][] | select(length == 4) | .[3]' "$WORK/events.json"; jq -r '.i' "$WORK/ev.arch"; } \
+    | grep -E '^[0-9a-fA-F.:]+$' | sort -u > "$WORK/ips"
   : > "$WORK/rdns.tsv"; : > "$WORK/geo.tsv"; : > "$WORK/asn.tsv"
 
   # -- reverse DNS
@@ -350,13 +375,47 @@ if [ "$EV_OK" = "1" ] && [ "$INCLUDE_IP" = "1" ] && { [ "$IP_LOOKUP" = "1" ] || 
     && jq --slurpfile h "$WORK/hosts.json" '. + {hosts: $h[0]}' "$WORK/events.json" > "$WORK/events.new" \
     && mv -f "$WORK/events.new" "$WORK/events.json"
 fi
+# ------------------------------------------------------------------ archive
+# archive/<first 2 hex digits of the Message-ID's md5>.jsonl: the events that left the window, one per line, with the
+# host of their IP when known. Appended before the window is saved (a crash in between repeats lines, which the plugin
+# skips); when it fails, nothing of the run is saved, so the next run moves them again. With KEEP_DAYS, lines older
+# than that are removed once a day.
+archive(){
+  local a="$OUT/archive" m f oldest
+  if [ -s "$WORK/ev.arch" ]; then
+    install -d -m 0755 "$a" "$WORK/arch" || return 1
+    jq -r '.m' "$WORK/ev.arch" | sort -u | while IFS= read -r m; do
+      printf '%s\t%s\n' "$m" "$(printf '%s' "$m" | md5sum | cut -c1-2)"
+    done > "$WORK/shards.tsv"
+    [ -s "$WORK/hosts.json" ] || echo '{}' > "$WORK/hosts.json"
+    jq -nr --rawfile sh "$WORK/shards.tsv" --slurpfile h "$WORK/hosts.json" '
+      ($sh | split("\n") | map(select(. != "") | split("\t") | {key: .[0], value: .[1]}) | from_entries) as $S
+      | inputs | $S[.m] + "\t" + (. + (if .i != "" and $h[0][.i] then {h: $h[0][.i]} else {} end) | tojson)' \
+      "$WORK/ev.arch" | awk -F'\t' -v d="$WORK/arch" '{ print $2 > (d "/" $1 ".jsonl") }' || return 1
+    for f in "$WORK"/arch/*.jsonl; do
+      [ -f "$f" ] || continue
+      { cat "$a/${f##*/}" 2>/dev/null; cat "$f"; } > "$a/.${f##*/}.tmp" && chmod 644 "$a/.${f##*/}.tmp" \
+        && mv -f "$a/.${f##*/}.tmp" "$a/${f##*/}" || return 1
+    done
+  fi
+  if [ "$KEEP_DAYS" -gt 0 ] && [ -d "$a" ] && [ -z "$(find "$DATA/.pruned" -mmin -1440 2>/dev/null)" ]; then
+    oldest=$(( NOW - KEEP_DAYS * 86400 ))
+    for f in "$a"/*.jsonl; do
+      [ -f "$f" ] || continue
+      jq -c --argjson oldest "$oldest" 'select((.d | fromdate) >= $oldest)' "$f" > "$WORK/pruned" && publish "$WORK/pruned" "$f"
+    done
+    touch "$DATA/.pruned"
+  fi
+  return 0
+}
+
 if [ "$EV_OK" = "1" ]; then
   publish "$WORK/events.json" "$OUT/events.json"
-  # accumulated events and cursor, for the next run (a dry run only changes its copy)
-  if [ "$R_KEEP" = "1" ]; then
-    cp "$WORK/ev.norm" "$DATA/events.jsonl.tmp" && mv -f "$DATA/events.jsonl.tmp" "$DATA/events.jsonl"
-  fi
+  archive || { log "archive not written to $OUT/archive, run not saved"; exit 1; }
+  # accumulated events, cursor and start, for the next run (a dry run only changes its copy)
+  cp "$WORK/ev.norm" "$DATA/events.jsonl.tmp" && mv -f "$DATA/events.jsonl.tmp" "$DATA/events.jsonl"
   echo "${CURSOR:-$NOW}" > "$DATA/cursor"
+  echo "$START" > "$DATA/start"
   # the driver's commit step (e.g. removing read messages from a queue), only once the events are stored
   if [ "$DRY" != "1" ] && declare -F r_commit >/dev/null; then r_commit; fi
 fi

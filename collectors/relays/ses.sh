@@ -24,7 +24,6 @@ R_CAPS='["events", "opens", "clicks"]'
 R_DAYS=90                      # kept by the collector, not by SES: any window works
 [ -n "${EVENT_DAYS:-}" ] && [ "$EVENT_DAYS" -gt 90 ] 2>/dev/null && R_DAYS=$EVENT_DAYS
 R_LAG="a few minutes"
-R_KEEP=1
 SES_BATCHES=200                # receive calls per run at most (10 events each)
 
 r_auth(){

@@ -63,7 +63,7 @@ Keep everything under one folder, with the collector (key, config, state) out of
 ```
 /srv/relay-tracking/
   collector/   root only: script, config, state (caches, location data)
-  data/        collector output, read by Roundcube
+  data/        collector output, read by Roundcube, with the history of every mail (archive/): back it up
   plugin/      the plugin, if Roundcube runs in a container and loads it from a mount
 ```
 
@@ -120,6 +120,10 @@ echo "*/5 * * * * root $C/relay-collector.sh $C/brevo.conf" > /etc/cron.d/relay-
 
 The box appears for users with an identity on one of `DOMAINS`. Brevo publishes events up to 1-2 hours after
 sending; until then a mail shows as pending. For a second relay, add another settings file, folder and cron line.
+
+Relays keep events for a limited time (Brevo: 90 days). The collector keeps them longer: events older than the
+relay's window move to `archive/` in the relay's data folder and stay there forever, unless `KEEP_DAYS` says
+otherwise. A mail's history therefore starts when the collector first ran, and only lasts as long as that folder.
 
 Upgrading from 2.3 and earlier: the old `brevo-collector.sh` keeps working. To move to the new one, copy the files
 as above, add `RELAY=brevo` to the existing settings file and point the cron line at
@@ -191,7 +195,8 @@ Set in the settings file (see [the example](collectors/relay-collector.conf.exam
 | `IP_ASN`       | `1`                               | network owner from DB-IP Lite data, searched locally (needs `INCLUDE_IP=1`, `xz`); `0` turns it off                              |
 | `IP_GEO`       | `0`                               | `1` adds the location from DB-IP Lite data, searched locally (needs `INCLUDE_IP=1`, `xz`)                                        |
 | `GEO_URL`      | this repo's `geoip` branch        | where the owner and location data is downloaded from                                                                             |
-| `EVENT_DAYS`   | what the relay keeps              | days of events kept                                                                                                              |
+| `EVENT_DAYS`   | what the relay keeps              | days of events read from the relay                                                                                               |
+| `KEEP_DAYS`    | `0`                               | days events are kept after the relay dropped them, in `archive/` (`0`: forever; at least `EVENT_DAYS`)                           |
 | `LAG`          | the relay's                       | publication delay shown while a mail is pending                                                                                  |
 | `STATE_DIR`    | `/var/lib/relay-tracking-<relay>` | lock, caches, accumulated events, location data; keep it on persistent storage                                                   |
 
@@ -207,7 +212,8 @@ want it. The plugin only does it itself with self tracking (`relay_tracking_self
 chose to track; it then keeps the date and type of each open and click, the clicked link, and the IP only with
 `relay_tracking_self_ip`, for `relay_tracking_self_days`. For relays, without `INCLUDE_IP` the data holds only dates,
 event types, clicked links and bounce reasons. IP addresses are the recipients' (or their provider's proxy): personal
-data, so only keep them with a basis for it. Owners and locations are looked up locally and never send the IPs anywhere;
+data, so only keep them with a basis for it. Everything a collector writes is kept forever by default: set
+`KEEP_DAYS` to limit it. Owners and locations are looked up locally and never send the IPs anywhere;
 reverse DNS (`IP_LOOKUP`) asks the DNS, and the IP link sends one IP to iplocation.net when clicked. Self tracking looks
 nothing up: its IPs (with `relay_tracking_self_ip`) are shown without location or owner.
 
@@ -227,10 +233,10 @@ it wherever an owner or a location is shown.
 What a collector writes to `<relay_tracking_dir>/<id>/` (`id`: `[a-z0-9_-]{1,32}`), atomically (temporary file, then
 rename), folder `755` and files `644`:
 
-| File          | Content                                                                                                                                                                                      |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `relay.json`  | `{"format": 1, "id", "name", "domains": [..], "capabilities": [..], "lag", "events_days", "headers"?: {..}}`                                                                                 |
-| `events.json` | `{"generated", "days", "since"?, "messages": {"<Message-ID>": {"<recipient>": [[date, type, extra?, ip?], ...]}}, "hosts"?: {"<ip>": {"rdns", "provider", "country"?, "region"?, "city"?}}}` |
+| File          | Content                                                                                                                                                                                                  |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `relay.json`  | `{"format": 1, "id", "name", "domains": [..], "capabilities": [..], "lag", "events_days", "headers"?: {..}}`                                                                                             |
+| `events.json` | `{"generated", "days", "since"?, "archive"?, "messages": {"<Message-ID>": {"<recipient>": [[date, type, extra?, ip?], ...]}}, "hosts"?: {"<ip>": {"rdns", "provider", "country"?, "region"?, "city"?}}}` |
 
 - `capabilities`: `events` (required), `opens`, `clicks`.
 - `headers`: headers the plugin adds to each mail sent from the relay's domains, `{message_id}` replaced by the mail's
@@ -238,7 +244,11 @@ rename), folder `755` and files `644`:
 - `<Message-ID>`: the header as Roundcube sent it, angle brackets included. Recipient `"*"` = events without a
   recipient, applied to all of them.
 - `since`: start of the data when the collector could not read the whole `days` window; older mails then show
-  "history unavailable".
+  "history unavailable". With `archive: true`, the start of all the data, `archive/` included.
+- `archive/<xx>.jsonl` (with `archive: true`): events older than the `days` window, one JSON object per line,
+  `{"m": Message-ID, "e": recipient, "d": date, "t": type, "l": link, "r": reason, "i": IP, "h"?: host of the IP}`,
+  `m` first; `xx` = the first two hex digits of the MD5 of the Message-ID. Lines are appended, a repeated line counts
+  once.
 - Event types: `sent`, `delivered`, `deferred`, `soft_bounce`, `hard_bounce`, `blocked`, `invalid`, `error`, `opened`,
   `proxy_open`, `clicked`, `spam`, `unsubscribed`; others are ignored. `extra` = clicked link or bounce reason (`""`
   when empty but an IP follows). Dates in ISO 8601.

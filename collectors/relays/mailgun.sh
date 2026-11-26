@@ -16,7 +16,6 @@ R_NAME="Mailgun"
 R_CAPS='["events", "opens", "clicks"]'
 R_DAYS=30                      # depends on the plan (1 day on the free plan): set EVENT_DAYS to it
 R_LAG="a few minutes"
-R_KEEP=1
 R_HEADERS='{"X-Mailgun-Variables": "{\"rt_mid\": \"{message_id}\"}"}'
 case "${MAILGUN_REGION:-us}" in
   eu) API="https://api.eu.mailgun.net" ;;

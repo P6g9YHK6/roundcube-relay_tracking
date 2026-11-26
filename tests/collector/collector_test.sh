@@ -30,9 +30,11 @@ xz -T0 "$T"/branch/*.tsv && echo "2026-01 test" > "$T/branch/VERSION"
 C="$T/collector"; mkdir -p "$C"
 cp "$ROOT/collectors/relay-collector.sh" "$C/" && cp -r "$ROOT/collectors/relays" "$C/" && cp "$HERE/fixture-driver.sh" "$C/relays/fixture.sh"
 echo 'secret-key' > "$T/key"; chmod 600 "$T/key"
+START=$(date +%s)
 conf(){   # extra settings...
   { echo "RELAY=fixture"; echo "RELAY_DIR=$T/data/fixture"; echo 'DOMAINS="example.org"'; echo "API_KEY_FILE=$T/key"
     echo "STATE_DIR=$T/state"; echo "GEO_URL=file://$T/branch"; echo "FIXTURE_EVENTS=$HERE/events.jsonl"
+    echo "FIXTURE_NOW=$START"
     printf '%s\n' "$@"; } > "$T/c.conf"
   chmod 600 "$T/c.conf"
 }
@@ -43,7 +45,7 @@ conf 'INCLUDE_IP=0'
 run; check 'run without IPs' '0' "$?"
 check 'relay.json' '{"format":1,"id":"fixture","name":"Fixture relay","domains":["example.org"],"capabilities":["events","opens","clicks"],"lag":"a minute","headers":{"X-Fixture-Mid":"{message_id}"}}' \
   "$(jq -c '{format, id, name, domains, capabilities, lag, headers}' "$T/data/fixture/relay.json")"
-check 'only our domains, events without sender kept' '["<one@example.org>","<two@example.org>"]' "$(jq -c '.messages | keys' "$E")"
+check 'only our domains, events without sender kept' '["<aged@example.org>","<one@example.org>","<two@example.org>"]' "$(jq -c '.messages | keys' "$E")"
 check 'events outside the window dropped' 'false' "$(jq '.messages | has("<old@example.org>")' "$E")"
 check 'events per recipient, in date order' '["sent","delivered","opened","clicked"]' "$(jq -c '[.messages["<one@example.org>"]["a@x.test"][][1]]' "$E")"
 check 'bounce reason' '"no such user"' "$(jq -c '.messages["<one@example.org>"]["b@x.test"][0][2]' "$E")"
@@ -71,6 +73,27 @@ conf 'INCLUDE_IP=1'
 DRY_RUN=1 bash "$C/relay-collector.sh" "$T/c.conf" > "$T/dry" 2>&1
 check 'dry run writes nothing' 'null' "$(jq -c '.hosts["1.0.0.7"]' "$E")"
 check 'dry run shows masked output' 'true' "$(grep -qF '"a***@x.test"' "$T/dry" && echo true || echo false)"
+
+# the relay stops returning <two> and <aged>, and the window shrinks to a day: <two> stays, <aged> (2 days) goes to
+# the archive, with its host
+grep -vE '<(two|aged)@' "$HERE/events.jsonl" > "$T/fewer.jsonl"
+conf 'INCLUDE_IP=1' 'IP_GEO=1' 'EVENT_DAYS=1' "FIXTURE_EVENTS=$T/fewer.jsonl"
+run; check 'run after the relay dropped events' '0' "$?"
+check 'events the relay no longer returns kept' 'true' "$(jq '.messages | has("<two@example.org>")' "$E")"
+check 'no event twice after several runs' '4' "$(jq '.messages["<one@example.org>"]["a@x.test"] | length' "$E")"
+check 'events leaving the window out of events.json' 'false' "$(jq '.messages | has("<aged@example.org>")' "$E")"
+A="$T/data/fixture/archive/$(printf '%s' '<aged@example.org>' | md5sum | cut -c1-2).jsonl"
+check 'archived in the Message-ID hash file, with the host' '{"m":"<aged@example.org>","e":"a@x.test","t":"opened","i":"1.0.0.7","city":"South Brisbane"}' \
+  "$(jq -c '{m, e, t, i, city: .h.city}' "$A" 2>/dev/null)"
+check 'archive readable by Roundcube' '644 755' "$(stat -c %a "$A") $(stat -c %a "${A%/*}")"
+check 'archived events no longer in the window state' '0' "$(grep -c aged "$T/state/data/events.jsonl")"
+check 'events.json says where the history starts' "true $(cat "$T/state/data/start")" "$(jq -r '"\(.archive) \(.since)"' "$E")"
+run; check 'a second run archives nothing twice' '1' "$(wc -l < "$A")"
+
+conf 'INCLUDE_IP=1' 'EVENT_DAYS=1' 'KEEP_DAYS=1' "FIXTURE_EVENTS=$T/fewer.jsonl"
+run; check 'KEEP_DAYS drops older archived events' '0' "$(wc -l < "$A")"
+conf 'KEEP_DAYS=forever'
+check 'refuses a KEEP_DAYS that is not a number' '1' "$(bash "$C/relay-collector.sh" "$T/c.conf" 2>/dev/null; echo $?)"
 
 chmod 666 "$T/c.conf"
 check 'refuses a settings file others can write' '1' "$(bash "$C/relay-collector.sh" "$T/c.conf" 2>/dev/null; echo $?)"

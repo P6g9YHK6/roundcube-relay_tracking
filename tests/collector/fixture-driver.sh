@@ -11,6 +11,7 @@ r_auth(){ cfg_header "x-key: $KEY"; }
 
 r_fetch(){
   [ -r "$FIXTURE_EVENTS" ] || return 1
-  # dates relative to now, so they stay inside the window: d = seconds ago
-  jq -c --argjson now "$NOW" '.d = ($now - .d)' "$FIXTURE_EVENTS" >> "$EV"
+  # dates relative to the test's start (FIXTURE_NOW), so they stay inside the window and the same in every run:
+  # d = seconds ago
+  jq -c --argjson now "${FIXTURE_NOW:-$NOW}" '.d = ($now - .d)' "$FIXTURE_EVENTS" >> "$EV"
 }

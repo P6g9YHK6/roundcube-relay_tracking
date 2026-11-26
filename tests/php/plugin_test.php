@@ -125,6 +125,24 @@ $env = box(['relay_tracking_dir' => $dir]);
 check('relay only: own hits ignored when self tracking is off',
     count($env['recipients'][0]['events'] ?? []) === 2 && $env['recipients'][1]['events'] === []);
 
+// archive: events the relay no longer has, from the Message-ID's hash file (a repeated line counted once)
+file_put_contents($dir . '/brevo/events.json', json_encode(['generated' => time(), 'days' => 30, 'archive' => true,
+    'since' => time() - 400 * 86400, 'messages' => [
+    '<abc@example.org>' => ['a@x.test' => [['2026-01-01T10:00:09Z', 'delivered']]]]]));
+@mkdir($dir . '/brevo/archive');
+$line = '{"m":"<abc@example.org>","e":"a@x.test","d":"2026-01-01T10:00:02Z","t":"sent","l":"","r":"","i":"192.0.2.9",'
+    . '"h":{"rdns":"","provider":"Example Net","country":"CH","region":"","city":"Bern"}}' . "\n";
+file_put_contents($dir . '/brevo/archive/' . substr(md5('<abc@example.org>'), 0, 2) . '.jsonl', $line . $line
+    . '{"m":"<other@example.org>","e":"a@x.test","d":"2026-01-01T10:00:00Z","t":"sent","l":"","r":"","i":""}' . "\n");
+$env = box(['relay_tracking_dir' => $dir]);
+check('archived events merged before the window\'s, once',
+    array_map(function ($ev) { return $ev[1]; }, $env['recipients'][0]['events'] ?? []) === ['sent', 'delivered'],
+    json_encode($env['recipients'][0] ?? null));
+check('archived IP with its host', ($env['recipients'][0]['events'][0][3] ?? '') === '192.0.2.9'
+    && ($env['hosts']->{'192.0.2.9'}['provider'] ?? '') === 'Example Net'
+    && ($env['hosts']->{'192.0.2.9'}['location'] ?? '') === 'Bern, CH', json_encode($env['hosts']));
+check('history length from "since" with an archive', $env['days'] === 400, json_encode($env['days']));
+
 // ---------------------------------------------------------------- compose and preferences
 $p = plugin('compose', ['relay_tracking_self' => true]);
 check('compose checkbox, ticked by default', strpos(implode('', $p->api->content['composeoptions'] ?? []), 'name="_relay_tracking_self" checked') !== false);
@@ -156,6 +174,8 @@ $left = rows('SELECT (SELECT COUNT(*) FROM relay_tracking_mail) AS m, (SELECT CO
 check('mails older than relay_tracking_self_days removed with their hits', $left === [['m' => 1, 'h' => 0]], json_encode($left));
 
 @unlink($GLOBALS['DB']);
+array_map('unlink', glob($dir . '/brevo/archive/*'));
+@rmdir($dir . '/brevo/archive');
 array_map('unlink', glob($dir . '/brevo/*'));
 @rmdir($dir . '/brevo');
 @rmdir($dir);

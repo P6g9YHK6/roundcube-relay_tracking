@@ -38,6 +38,9 @@ STATE_DIR=/srv/relay-tracking/collector/state/brevo
 #EVENT_DAYS=30
 #LAG="a few minutes"
 
+# Days events are kept once the relay has dropped them, in RELAY_DIR/archive (0: forever; at least EVENT_DAYS)
+#KEEP_DAYS=0
+
 # ---------------------------------------------------------------- relay settings (only the chosen relay's)
 # Postmark: message stream used for SMTP
 #POSTMARK_STREAM=outbound

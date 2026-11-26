@@ -8,3 +8,4 @@
 {"m":"<other@elsewhere.test>","f":"them@elsewhere.test","e":"a@x.test","d":100,"t":"sent","l":"","r":"","i":""}
 {"m":"<two@example.org>","f":"","e":"*","d":50,"t":"sent","l":"","r":"","i":""}
 {"m":"<old@example.org>","f":"me@example.org","e":"a@x.test","d":9999999,"t":"sent","l":"","r":"","i":""}
+{"m":"<aged@example.org>","f":"me@example.org","e":"a@x.test","d":172800,"t":"opened","l":"","r":"","i":"1.0.0.7"}
