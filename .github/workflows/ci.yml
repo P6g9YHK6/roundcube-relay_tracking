@@ -78,6 +78,18 @@ jobs:
         run: shellcheck -S warning collectors/relay-collector.sh collectors/relays/*.sh tests/*.sh tests/*/*.sh
       - name: python
         run: python3 -m py_compile tools/dbip-convert.py
+      - name: ruff
+        run: pipx run ruff==0.8.6 check --isolated --select E,F,W,B --line-length 120 tools/
+
+  workflows:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint (with shellcheck on the run steps)
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
 
   collector:
     if: github.event_name != 'schedule'
@@ -126,6 +138,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: tests/consistency_test.sh
+      - name: no trailing whitespace or stray blank lines at the end of a file
+        run: git diff --check "$(git hash-object -t tree /dev/null)" HEAD
       - run: composer validate --no-check-publish --no-check-lock
 
   geoip-fresh:
