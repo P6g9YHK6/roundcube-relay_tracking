@@ -32,10 +32,10 @@ jobs:
             asn="https://download.db-ip.com/free/dbip-asn-lite-$m.csv.gz"
             mod=$(curl -sfI -m 30 "$city" | tr -d '\r' | sed -n 's/^last-modified: //Ip' || true)
             if [ -n "$mod" ] && curl -sfI -m 30 "$asn" > /dev/null; then
-              echo "city=$city" >> "$GITHUB_OUTPUT"
-              echo "asn=$asn" >> "$GITHUB_OUTPUT"
               # + the converter's hash: a change to the converter rebuilds the branch too
-              echo "version=$m $mod $(sha256sum tools/dbip-convert.py | cut -c1-8)" >> "$GITHUB_OUTPUT"
+              { echo "city=$city"
+                echo "asn=$asn"
+                echo "version=$m $mod $(sha256sum tools/dbip-convert.py | cut -c1-8)"; } >> "$GITHUB_OUTPUT"
               exit 0
             fi
           done
@@ -48,7 +48,7 @@ jobs:
           current=$(git fetch -q origin geoip 2>/dev/null && git show origin/geoip:VERSION 2>/dev/null || true)
           echo "current: ${current:-none}"
           echo "latest:  ${{ steps.src.outputs.version }}"
-          [ "$current" = "${{ steps.src.outputs.version }}" ] && echo "new=0" >> "$GITHUB_OUTPUT" || echo "new=1" >> "$GITHUB_OUTPUT"
+          if [ "$current" = "${{ steps.src.outputs.version }}" ]; then echo "new=0"; else echo "new=1"; fi >> "$GITHUB_OUTPUT"
 
       - name: Convert and publish
         if: steps.cmp.outputs.new == '1'
