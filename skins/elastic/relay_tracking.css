@@ -3,21 +3,21 @@
    green / red / amber only mark states. */
 
 #rt-track {
-    --rt-line: rgba(127, 127, 127, .22);
-    --rt-soft: rgba(127, 127, 127, .07);
+    --rt-line: rgba(127, 127, 127, 0.22);
+    --rt-soft: rgba(127, 127, 127, 0.07);
     --rt-ok: #30a46c;
     --rt-bad: #e5484d;
     --rt-auto: #b08800;
-    margin: .75rem 0 0;
+    margin: 0.75rem 0 0;
     border: 1px solid var(--rt-line);
-    border-radius: .6rem;
-    background: rgba(127, 127, 127, .03);
-    font-size: .9rem;
+    border-radius: 0.6rem;
+    background: rgba(127, 127, 127, 0.03);
+    font-size: 0.9rem;
     overflow: hidden;
 }
 
 #rt-track.rt-alert {
-    border-color: rgba(229, 72, 77, .55);
+    border-color: rgba(229, 72, 77, 0.55);
 }
 
 #rt-track button {
@@ -34,9 +34,9 @@
 #rt-track .rt-head {
     display: flex;
     align-items: center;
-    gap: .75rem;
+    gap: 0.75rem;
     width: 100%;
-    padding: .6rem 1rem;
+    padding: 0.6rem 1rem;
     border: 0;
     background: transparent;
     text-align: left;
@@ -52,26 +52,26 @@
 }
 
 #rt-track .rt-head:before {
-    content: "\f201";                  /* chart: tracking */
-    font-family: "Icons";
+    content: '\f201'; /* chart: tracking */
+    font-family: 'Icons';
     font-weight: 900;
-    opacity: .7;
+    opacity: 0.7;
 }
 
 #rt-track.rt-alert .rt-head:before {
-    content: "\f071";
+    content: '\f071';
     color: var(--rt-bad);
     opacity: 1;
 }
 
 #rt-track .rt-head:not(:disabled):after {
-    content: "\f078";
-    font-family: "Icons";
+    content: '\f078';
+    font-family: 'Icons';
     font-weight: 900;
-    font-size: .75rem;
+    font-size: 0.75rem;
     margin-left: auto;
-    opacity: .55;
-    transition: transform .15s;
+    opacity: 0.55;
+    transition: transform 0.15s;
 }
 
 #rt-track.rt-open .rt-head:after {
@@ -84,7 +84,7 @@
 }
 
 #rt-track .rt-summary {
-    opacity: .75;
+    opacity: 0.75;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -92,13 +92,13 @@
 }
 
 #rt-track .rt-body {
-    padding: 0 1rem .6rem;
+    padding: 0 1rem 0.6rem;
     border-top: 1px solid var(--rt-line);
 }
 
 /* ---------- one recipient ---------- */
 #rt-track .rt-rcpt {
-    padding: .75rem 0 .5rem;
+    padding: 0.75rem 0 0.5rem;
 }
 
 #rt-track .rt-rcpt + .rt-rcpt {
@@ -108,8 +108,8 @@
 #rt-track .rt-rhead {
     display: flex;
     align-items: center;
-    gap: .75rem;
-    margin-bottom: .55rem;
+    gap: 0.75rem;
+    margin-bottom: 0.55rem;
 }
 
 #rt-track .rt-email {
@@ -120,11 +120,11 @@
 #rt-track .rt-toggle {
     margin-left: auto;
     flex: none;
-    padding: .15rem .65rem;
+    padding: 0.15rem 0.65rem;
     border: 1px solid var(--rt-line);
     border-radius: 1rem;
     background: transparent;
-    font-size: .78rem;
+    font-size: 0.78rem;
     cursor: pointer;
 }
 
@@ -133,21 +133,21 @@
 }
 
 #rt-track .rt-toggle:after {
-    content: "\f078";
-    font-family: "Icons";
+    content: '\f078';
+    font-family: 'Icons';
     font-weight: 900;
-    font-size: .65rem;
-    margin-left: .4rem;
-    opacity: .6;
+    font-size: 0.65rem;
+    margin-left: 0.4rem;
+    opacity: 0.6;
 }
 
-#rt-track .rt-toggle[aria-expanded="true"]:after {
-    content: "\f077";
+#rt-track .rt-toggle[aria-expanded='true']:after {
+    content: '\f077';
 }
 
 #rt-track .rt-none {
-    font-size: .85rem;
-    opacity: .65;
+    font-size: 0.85rem;
+    opacity: 0.65;
 }
 
 /* ---------- stepper: Sent > Delivered > Opened > Clicked ---------- */
@@ -162,19 +162,19 @@
     position: relative;
     flex: 1 1 0;
     min-width: 0;
-    padding: 0 .4rem 0 0;
+    padding: 0 0.4rem 0 0;
     display: flex;
     flex-direction: column;
-    gap: .1rem;
+    gap: 0.1rem;
 }
 
 /* connector from the previous step's dot to this one */
 #rt-track .rt-st + .rt-st:before {
-    content: "";
+    content: '';
     position: absolute;
-    top: .3rem;
-    right: calc(100% - .1rem);
-    width: calc(100% - .9rem);
+    top: 0.3rem;
+    right: calc(100% - 0.1rem);
+    width: calc(100% - 0.9rem);
     height: 2px;
     background: var(--rt-line);
 }
@@ -185,31 +185,47 @@
 }
 
 #rt-track .rt-dot {
-    width: .75rem;
-    height: .75rem;
+    width: 0.75rem;
+    height: 0.75rem;
     border-radius: 50%;
-    border: 2px solid rgba(127, 127, 127, .45);
+    border: 2px solid rgba(127, 127, 127, 0.45);
     background: transparent;
     box-sizing: border-box;
-    margin-bottom: .2rem;
+    margin-bottom: 0.2rem;
 }
 
-#rt-track .rt-st-done .rt-dot { border-color: var(--rt-ok); background: var(--rt-ok); }
-#rt-track .rt-st-bad .rt-dot { border-color: var(--rt-bad); background: var(--rt-bad); }
-#rt-track .rt-st-auto .rt-dot { border-color: var(--rt-auto); border-style: dashed; }
+#rt-track .rt-st-done .rt-dot {
+    border-color: var(--rt-ok);
+    background: var(--rt-ok);
+}
+#rt-track .rt-st-bad .rt-dot {
+    border-color: var(--rt-bad);
+    background: var(--rt-bad);
+}
+#rt-track .rt-st-auto .rt-dot {
+    border-color: var(--rt-auto);
+    border-style: dashed;
+}
 
 #rt-track .rt-st-label {
-    font-size: .8rem;
+    font-size: 0.8rem;
     font-weight: 600;
 }
 
-#rt-track .rt-st-todo .rt-st-label { opacity: .45; font-weight: 400; }
-#rt-track .rt-st-bad .rt-st-label { color: var(--rt-bad); }
-#rt-track .rt-st-auto .rt-st-label { color: var(--rt-auto); }
+#rt-track .rt-st-todo .rt-st-label {
+    opacity: 0.45;
+    font-weight: 400;
+}
+#rt-track .rt-st-bad .rt-st-label {
+    color: var(--rt-bad);
+}
+#rt-track .rt-st-auto .rt-st-label {
+    color: var(--rt-auto);
+}
 
 #rt-track .rt-st-meta {
-    font-size: .75rem;
-    opacity: .7;
+    font-size: 0.75rem;
+    opacity: 0.7;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -220,9 +236,9 @@
 #rt-track .rt-tl {
     max-height: 18rem;
     overflow: auto;
-    margin: .7rem 0 .2rem;
+    margin: 0.7rem 0 0.2rem;
     border: 1px solid var(--rt-line);
-    border-radius: .4rem;
+    border-radius: 0.4rem;
 }
 
 #rt-track .rt-tl[hidden] {
@@ -232,12 +248,12 @@
 #rt-track .rt-timeline {
     width: 100%;
     border-collapse: collapse;
-    font-size: .8rem;
+    font-size: 0.8rem;
 }
 
 #rt-track .rt-timeline th,
 #rt-track .rt-timeline td {
-    padding: .3rem .75rem;
+    padding: 0.3rem 0.75rem;
     text-align: left;
     vertical-align: top;
 }
@@ -245,14 +261,14 @@
 #rt-track .rt-timeline thead th {
     border-bottom: 1px solid var(--rt-line);
     font-weight: 600;
-    font-size: .72rem;
+    font-size: 0.72rem;
     text-transform: uppercase;
-    letter-spacing: .03em;
-    opacity: .75;
+    letter-spacing: 0.03em;
+    opacity: 0.75;
 }
 
 #rt-track .rt-timeline tbody tr:nth-child(even) {
-    background: rgba(127, 127, 127, .05);
+    background: rgba(127, 127, 127, 0.05);
 }
 
 /* time, event and IP take what they need, the detail column the rest */
@@ -281,7 +297,7 @@
 #rt-track .rt-ip-addr {
     display: block;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: .78rem;
+    font-size: 0.78rem;
     white-space: nowrap;
 }
 
@@ -298,29 +314,36 @@
 
 #rt-track .rt-ip-geo {
     display: block;
-    font-size: .74rem;
+    font-size: 0.74rem;
     white-space: nowrap;
 }
 
 #rt-track .rt-ip-geo:before {
-    content: "\f3c5";                  /* map marker */
-    font-family: "Icons";
+    content: '\f3c5'; /* map marker */
+    font-family: 'Icons';
     font-weight: 900;
-    font-size: .65rem;
-    margin-right: .3rem;
-    opacity: .55;
+    font-size: 0.65rem;
+    margin-right: 0.3rem;
+    opacity: 0.55;
 }
 
 #rt-track .rt-ip-owner {
     display: block;
-    font-size: .72rem;
-    opacity: .65;
+    font-size: 0.72rem;
+    opacity: 0.65;
     white-space: nowrap;
 }
 
-#rt-track .rt-row-auto { color: var(--rt-auto); }
-#rt-track .rt-row-retried td { opacity: .55; }
-#rt-track .rt-row-bad .rt-ev { color: var(--rt-bad); font-weight: 600; }
+#rt-track .rt-row-auto {
+    color: var(--rt-auto);
+}
+#rt-track .rt-row-retried td {
+    opacity: 0.55;
+}
+#rt-track .rt-row-bad .rt-ev {
+    color: var(--rt-bad);
+    font-weight: 600;
+}
 
 #rt-track .rt-credit a {
     color: inherit;
@@ -328,16 +351,16 @@
 }
 
 #rt-track .rt-note {
-    margin: .5rem 0 0;
-    font-size: .78rem;
-    opacity: .7;
+    margin: 0.5rem 0 0;
+    font-size: 0.78rem;
+    opacity: 0.7;
 }
 
 /* phone: stepper in two rows, no connectors */
 @media (max-width: 480px) {
     #rt-track .rt-stepper {
         flex-wrap: wrap;
-        row-gap: .5rem;
+        row-gap: 0.5rem;
     }
 
     #rt-track .rt-st {

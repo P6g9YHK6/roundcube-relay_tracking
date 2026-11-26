@@ -44,7 +44,8 @@
     // Date as Roundcube formats it for this user (date/time format, pretty dates, timezone: env "dates", filled
     // by the PHP side); the browser's short format only if a date is missing there
     function fmt(iso) {
-        var dates = (rc.env.relay_tracking_msg || {}).dates || {}, d = new Date(iso);
+        var dates = (rc.env.relay_tracking_msg || {}).dates || {},
+            d = new Date(iso);
         if (dates[iso]) {
             return dates[iso];
         }
@@ -87,7 +88,8 @@
     // (click) or reason (bounce), ev[3] the IP when the collector includes it (INCLUDE_IP=1).
     // Row kinds: ok, auto (automatic open, not a read), retried (temporary failure before a delivery), bad (problem).
     function analyse(events) {
-        var a = { opens: 0, auto_opens: 0, clicks: 0, problems: [], rows: [] }, delivered_t = 0;
+        var a = { opens: 0, auto_opens: 0, clicks: 0, problems: [], rows: [] },
+            delivered_t = 0;
 
         events.forEach(function (ev) {
             if (String(ev[1]) === 'delivered' && !a.delivered) {
@@ -97,41 +99,36 @@
         });
 
         events.forEach(function (ev) {
-            var t = String(ev[1] || ''), d = ev[0], row = { d: d, k: t, detail: ev[2] || '', ip: ev[3] || '', kind: 'ok' };
+            var t = String(ev[1] || ''),
+                d = ev[0],
+                row = { d: d, k: t, detail: ev[2] || '', ip: ev[3] || '', kind: 'ok' };
             if (t === 'sent') {
                 a.sent = a.sent || d;
-            }
-            else if (t === 'delivered') {
+            } else if (t === 'delivered') {
                 // first one is a.delivered
-            }
-            else if (t === 'opened' || t === 'proxy_open') {
+            } else if (t === 'opened' || t === 'proxy_open') {
                 row.k = 'opened';
                 if (t === 'proxy_open' || (delivered_t && Math.abs(time(d) - delivered_t) < AUTO_OPEN_MS)) {
                     row.kind = 'auto';
                     a.auto_opens++;
-                }
-                else {
+                } else {
                     a.opens++;
                     a.first_open = a.first_open || d;
                     a.last_open = d;
                 }
-            }
-            else if (t === 'clicked') {
+            } else if (t === 'clicked') {
                 a.clicks++;
                 a.first_click = a.first_click || d;
                 a.last_click = d;
-            }
-            else if (PROBLEMS.indexOf(t) >= 0) {
+            } else if (PROBLEMS.indexOf(t) >= 0) {
                 if (delivered_t && TRANSIENT.indexOf(t) >= 0 && time(d) <= delivered_t) {
                     row.kind = 'retried';
-                }
-                else {
+                } else {
                     row.kind = 'bad';
                     a.problems.push(row);
                 }
-            }
-            else {
-                return;   // unknown type: ignored (common format)
+            } else {
+                return; // unknown type: ignored (common format)
             }
             a.rows.push(row);
         });
@@ -142,7 +139,9 @@
     // step (red); a later one (spam complaint, unsubscribe...) is added as a red step at the end. Without delivery
     // information (Roundcube's own tracking only): Sent > Opened > Clicked.
     function stepper(a, no_delivery) {
-        var ol = el('ol', 'rt-stepper'), stop = false, early = !a.delivered && a.problems.length ? a.problems[0] : null;
+        var ol = el('ol', 'rt-stepper'),
+            stop = false,
+            early = !a.delivered && a.problems.length ? a.problems[0] : null;
 
         function step(state, name, meta, title) {
             var li = el('li', 'rt-st rt-st-' + state);
@@ -160,12 +159,10 @@
         step(a.sent || a.delivered ? 'done' : 'todo', label('ev_sent'), a.sent ? fmt(a.sent) : '');
         if (no_delivery) {
             // no Delivered step
-        }
-        else if (early) {
+        } else if (early) {
             step('bad', label('ev_' + early.k), fmt(early.d), early.detail || null);
             stop = true;
-        }
-        else {
+        } else {
             step(a.delivered ? 'done' : 'todo', label('ev_delivered'), a.delivered ? fmt(a.delivered) : '');
         }
         if (a.opens) step(stop ? 'todo' : 'done', label('ev_opened'), count(a.opens, a.last_open));
@@ -179,26 +176,41 @@
     }
 
     function timeline(a, hosts) {
-        var with_detail = a.rows.some(function (x) { return x.detail; }),
-            with_ip = a.rows.some(function (x) { return x.ip; }),
-            table = el('table', 'rt-timeline' + (with_detail ? ' rt-has-detail' : '')), thead = el('thead'), hr = el('tr'),
+        var with_detail = a.rows.some(function (x) {
+                return x.detail;
+            }),
+            with_ip = a.rows.some(function (x) {
+                return x.ip;
+            }),
+            table = el('table', 'rt-timeline' + (with_detail ? ' rt-has-detail' : '')),
+            thead = el('thead'),
+            hr = el('tr'),
             tbody = el('tbody');
 
-        [['col_time', true], ['col_event', true], ['col_detail', with_detail], ['col_ip', with_ip]].forEach(function (c) {
+        [
+            ['col_time', true],
+            ['col_event', true],
+            ['col_detail', with_detail],
+            ['col_ip', with_ip],
+        ].forEach(function (c) {
             if (c[1]) hr.appendChild(el('th', null, label(c[0])));
         });
         thead.appendChild(hr);
         table.appendChild(thead);
 
         a.rows.forEach(function (x) {
-            var tr = el('tr', 'rt-row-' + x.kind), ev = el('td', 'rt-ev', label('ev_' + x.k) + (x.kind === 'auto' ? ' *' : ''));
+            var tr = el('tr', 'rt-row-' + x.kind),
+                ev = el('td', 'rt-ev', label('ev_' + x.k) + (x.kind === 'auto' ? ' *' : ''));
             if (x.kind === 'auto') ev.title = label('auto_open');
             tr.appendChild(el('td', 'rt-time', fmt(x.d)));
             tr.appendChild(ev);
             if (with_detail) tr.appendChild(el('td', 'rt-detail', x.detail));
             if (with_ip) {
                 // IP (a link for public ones), then where it is and who it belongs to; reverse DNS name on hover of the owner
-                var td = el('td', 'rt-ip'), h = hosts[x.ip] || {}, addr, owner;
+                var td = el('td', 'rt-ip'),
+                    h = hosts[x.ip] || {},
+                    addr,
+                    owner;
                 if (x.ip && !PRIVATE_IP.test(x.ip)) {
                     // public IP: opens a lookup page (the IP then goes to that site, only when clicked)
                     addr = el('a', 'rt-ip-addr', x.ip);
@@ -206,8 +218,7 @@
                     addr.target = '_blank';
                     addr.rel = 'noopener noreferrer';
                     addr.title = label('ip_more');
-                }
-                else {
+                } else {
                     addr = el('span', 'rt-ip-addr', x.ip);
                 }
                 td.appendChild(addr);
@@ -229,21 +240,31 @@
     }
 
     function render_track() {
-        var data = rc.env.relay_tracking_msg, header = document.getElementById('message-header');
+        var data = rc.env.relay_tracking_msg,
+            header = document.getElementById('message-header');
         if (!data || !header || document.getElementById('rt-track')) {
             return;
         }
 
-        var rcpts = data.recipients || [], n = rcpts.length, delivered = 0, opened = 0, opens = 0, clicks = 0, issues = 0,
+        var rcpts = data.recipients || [],
+            n = rcpts.length,
+            delivered = 0,
+            opened = 0,
+            opens = 0,
+            clicks = 0,
+            issues = 0,
             auto = false;
-        var box = el('section', 'rt-box'), head = el('button', 'rt-head'), body = el('div', 'rt-body');
+        var box = el('section', 'rt-box'),
+            head = el('button', 'rt-head'),
+            body = el('div', 'rt-body');
         box.id = 'rt-track';
         box.setAttribute('aria-label', fill(label('track'), { relay: data.name }));
         head.type = 'button';
         head.setAttribute('aria-expanded', 'false');
 
         rcpts.forEach(function (r) {
-            var a = analyse(r.events || []), row = el('div', 'rt-rcpt');
+            var a = analyse(r.events || []),
+                row = el('div', 'rt-rcpt');
             if (a.delivered) delivered++;
             if (a.opens) opened++;
             opens += a.opens;
@@ -264,7 +285,8 @@
             row.appendChild(stepper(a, data.self_only));
 
             // full timeline, folded unless something went wrong
-            var toggle = el('button', 'rt-toggle', label('timeline') + ' (' + a.rows.length + ')'), table = timeline(a, data.hosts || {});
+            var toggle = el('button', 'rt-toggle', label('timeline') + ' (' + a.rows.length + ')'),
+                table = timeline(a, data.hosts || {});
             toggle.type = 'button';
             table.hidden = !a.problems.length;
             toggle.setAttribute('aria-expanded', table.hidden ? 'false' : 'true');
@@ -279,20 +301,23 @@
 
         var summary;
         if (!data.known) {
-            summary = data.expired ? fill(label('expired'), { days: data.days })
-                : data.untracked ? fill(label('untracked'), { relay: data.name })
-                : fill(label('waiting'), { relay: data.name }) + (data.lag ? ' ' + fill(label('waiting_lag'), { lag: data.lag }) : '');
-        }
-        else if (data.self_only) {
+            summary = data.expired
+                ? fill(label('expired'), { days: data.days })
+                : data.untracked
+                  ? fill(label('untracked'), { relay: data.name })
+                  : fill(label('waiting'), { relay: data.name }) +
+                    (data.lag ? ' ' + fill(label('waiting_lag'), { lag: data.lag }) : '');
+        } else if (data.self_only) {
             // one row for all the recipients: opens are counted, not the recipients who opened
-            summary = (opens ? fill(label('sum_opens'), { n: opens }) : label('sum_not_opened'))
-                + (clicks ? ' · ' + clicks + ' ' + label(clicks > 1 ? 'ev_clicks' : 'ev_click') : '');
-        }
-        else {
-            summary = fill(label('sum_delivered'), { n: delivered, t: n })
-                + (opened ? ' · ' + fill(label('sum_opened'), { n: opened }) : '')
-                + (clicks ? ' · ' + clicks + ' ' + label(clicks > 1 ? 'ev_clicks' : 'ev_click') : '')
-                + (issues ? ' · ' + fill(label('sum_issues'), { n: issues }) : '');
+            summary =
+                (opens ? fill(label('sum_opens'), { n: opens }) : label('sum_not_opened')) +
+                (clicks ? ' · ' + clicks + ' ' + label(clicks > 1 ? 'ev_clicks' : 'ev_click') : '');
+        } else {
+            summary =
+                fill(label('sum_delivered'), { n: delivered, t: n }) +
+                (opened ? ' · ' + fill(label('sum_opened'), { n: opened }) : '') +
+                (clicks ? ' · ' + clicks + ' ' + label(clicks > 1 ? 'ev_clicks' : 'ev_click') : '') +
+                (issues ? ' · ' + fill(label('sum_issues'), { n: issues }) : '');
         }
 
         head.appendChild(el('span', 'rt-title', fill(label('track'), { relay: data.name })));
@@ -307,8 +332,13 @@
                 body.appendChild(el('p', 'rt-note', label('self_note')));
             }
             // DB-IP Lite data is CC BY 4.0: credit it wherever a location or a network owner is shown
-            if (Object.keys(data.hosts || {}).some(function (ip) { return data.hosts[ip].location || data.hosts[ip].provider; })) {
-                var credit = el('p', 'rt-note rt-credit', label('geo_credit') + ' '), a = el('a', null, 'DB-IP');
+            if (
+                Object.keys(data.hosts || {}).some(function (ip) {
+                    return data.hosts[ip].location || data.hosts[ip].provider;
+                })
+            ) {
+                var credit = el('p', 'rt-note rt-credit', label('geo_credit') + ' '),
+                    a = el('a', null, 'DB-IP');
                 a.href = 'https://db-ip.com';
                 a.target = '_blank';
                 a.rel = 'noopener noreferrer';
@@ -324,10 +354,9 @@
             });
             if (issues) {
                 box.classList.add('rt-alert');
-                head.click();                  // problem: open by default
+                head.click(); // problem: open by default
             }
-        }
-        else {
+        } else {
             head.disabled = true;
         }
 
@@ -337,8 +366,7 @@
     rc.addEventListener('init', function () {
         try {
             if (rc.env.task === 'mail' && (rc.env.action === 'show' || rc.env.action === 'preview')) render_track();
-        }
-        catch (e) {
+        } catch (e) {
             // never break the page initialisation
             if (window.console) console.error('relay_tracking', e);
         }

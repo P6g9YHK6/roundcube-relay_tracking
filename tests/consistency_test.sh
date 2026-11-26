@@ -24,7 +24,7 @@ v=$(grep -oP "'version' => '\K[0-9.]+" relay_tracking.php)
 check "CHANGELOG starts with $v" "$(head -5 CHANGELOG.md | grep -q "^## $v " || echo "top entry is not $v")"
 
 drivers=$(cd collectors/relays && ls *.sh | sed 's/\.sh$//' | sort)
-listed=$(grep -oP '^\| `RELAY` \| required \| relay: \K.*(?= \|)' README.md | grep -oP '`\K[a-z0-9_-]+' | sort)
+listed=$(grep -oP '^\| `RELAY` +\| required +\| relay: \K.*?(?= *\|$)' README.md | grep -oP '`\K[a-z0-9_-]+' | sort)
 check 'README lists every driver' "$(diff <(echo "$drivers") <(echo "$listed") | grep '^[<>]' | tr -d '<> ')"
 
 check 'no em dash' "$(git ls-files | grep -vE '\.(png|gz|xz)$' | xargs grep -l $'\xe2\x80\x94' 2>/dev/null)"

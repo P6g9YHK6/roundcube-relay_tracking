@@ -3,3 +3,5 @@
 .github export-ignore
 tools export-ignore
 docs export-ignore
+.prettierrc.json export-ignore
+.prettierignore export-ignore

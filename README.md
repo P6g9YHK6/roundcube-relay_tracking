@@ -160,18 +160,18 @@ are only used then.
 Copy [`config.inc.php.dist`](config.inc.php.dist) to `config.inc.php` in the plugin folder, or set these in
 Roundcube's main config.
 
-| Option | Default | |
-|---|---|---|
-| `relay_tracking_dir` | `/var/roundcube/relays` | folder the collectors write to |
-| `relay_tracking_untracked_after` | `86400` | seconds without any event before a mail shows "no tracking" instead of pending |
-| `relay_tracking_show_ip` | `true` | default of the preference "Show IP addresses" |
-| `relay_tracking_show_owner` | `true` | default of the preference "Show who the IP belongs to" |
-| `relay_tracking_show_location` | `true` | default of the preference "Show where the IP is" |
-| `relay_tracking_self` | `false` | self tracking: open pixel and links served by Roundcube |
-| `relay_tracking_self_url` | `''` | public address of Roundcube in the pixel and links (empty: the one the mail was sent from) |
-| `relay_tracking_self_track` | `true` | default of the preference "Track opens and clicks of the mails I send" |
-| `relay_tracking_self_ip` | `false` | keep the IP of each open and click |
-| `relay_tracking_self_days` | `90` | days the self tracking of a mail is kept (`0`: forever) |
+| Option                           | Default                 |                                                                                            |
+| -------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------ |
+| `relay_tracking_dir`             | `/var/roundcube/relays` | folder the collectors write to                                                             |
+| `relay_tracking_untracked_after` | `86400`                 | seconds without any event before a mail shows "no tracking" instead of pending             |
+| `relay_tracking_show_ip`         | `true`                  | default of the preference "Show IP addresses"                                              |
+| `relay_tracking_show_owner`      | `true`                  | default of the preference "Show who the IP belongs to"                                     |
+| `relay_tracking_show_location`   | `true`                  | default of the preference "Show where the IP is"                                           |
+| `relay_tracking_self`            | `false`                 | self tracking: open pixel and links served by Roundcube                                    |
+| `relay_tracking_self_url`        | `''`                    | public address of Roundcube in the pixel and links (empty: the one the mail was sent from) |
+| `relay_tracking_self_track`      | `true`                  | default of the preference "Track opens and clicks of the mails I send"                     |
+| `relay_tracking_self_ip`         | `false`                 | keep the IP of each open and click                                                         |
+| `relay_tracking_self_days`       | `90`                    | days the self tracking of a mail is kept (`0`: forever)                                    |
 
 The display preferences only change what is shown; add them to `$config['dont_override']` to enforce the defaults.
 With `relay_tracking_self_track` in it, its value applies to every mail and the compose box is not shown.
@@ -180,20 +180,20 @@ With `relay_tracking_self_track` in it, its value applies to every mail and the 
 
 Set in the settings file (see [the example](collectors/relay-collector.conf.example)).
 
-| Setting | Default | |
-|---|---|---|
-| `RELAY` | required | relay: `brevo`, `postmark`, `mailgun`, `sendgrid`, `mailjet`, `lettermint`, `smtp2go`, `scaleway`, `mailersend`, `ses`, `resend` |
-| `RELAY_DIR` | required | output folder, e.g. `/srv/relay-tracking/data/brevo` |
-| `DOMAINS` | required | sender domains going through the relay, space separated; other senders on the account are ignored |
-| `API_KEY_FILE` | required | file holding only the API key (`chmod 600`) |
-| `INCLUDE_IP` | `0` | `1` keeps the IP of each event |
-| `IP_LOOKUP` | `0` | `1` adds each IP's reverse DNS name (needs `INCLUDE_IP=1`, `dig`) |
-| `IP_ASN` | `1` | network owner from DB-IP Lite data, searched locally (needs `INCLUDE_IP=1`, `xz`); `0` turns it off |
-| `IP_GEO` | `0` | `1` adds the location from DB-IP Lite data, searched locally (needs `INCLUDE_IP=1`, `xz`) |
-| `GEO_URL` | this repo's `geoip` branch | where the owner and location data is downloaded from |
-| `EVENT_DAYS` | what the relay keeps | days of events kept |
-| `LAG` | the relay's | publication delay shown while a mail is pending |
-| `STATE_DIR` | `/var/lib/relay-tracking-<relay>` | lock, caches, accumulated events, location data; keep it on persistent storage |
+| Setting        | Default                           |                                                                                                                                  |
+| -------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `RELAY`        | required                          | relay: `brevo`, `postmark`, `mailgun`, `sendgrid`, `mailjet`, `lettermint`, `smtp2go`, `scaleway`, `mailersend`, `ses`, `resend` |
+| `RELAY_DIR`    | required                          | output folder, e.g. `/srv/relay-tracking/data/brevo`                                                                             |
+| `DOMAINS`      | required                          | sender domains going through the relay, space separated; other senders on the account are ignored                                |
+| `API_KEY_FILE` | required                          | file holding only the API key (`chmod 600`)                                                                                      |
+| `INCLUDE_IP`   | `0`                               | `1` keeps the IP of each event                                                                                                   |
+| `IP_LOOKUP`    | `0`                               | `1` adds each IP's reverse DNS name (needs `INCLUDE_IP=1`, `dig`)                                                                |
+| `IP_ASN`       | `1`                               | network owner from DB-IP Lite data, searched locally (needs `INCLUDE_IP=1`, `xz`); `0` turns it off                              |
+| `IP_GEO`       | `0`                               | `1` adds the location from DB-IP Lite data, searched locally (needs `INCLUDE_IP=1`, `xz`)                                        |
+| `GEO_URL`      | this repo's `geoip` branch        | where the owner and location data is downloaded from                                                                             |
+| `EVENT_DAYS`   | what the relay keeps              | days of events kept                                                                                                              |
+| `LAG`          | the relay's                       | publication delay shown while a mail is pending                                                                                  |
+| `STATE_DIR`    | `/var/lib/relay-tracking-<relay>` | lock, caches, accumulated events, location data; keep it on persistent storage                                                   |
 
 Relay settings (region, project, queue...) are listed at the end of the example and in each driver's header.
 
@@ -227,9 +227,9 @@ it wherever an owner or a location is shown.
 What a collector writes to `<relay_tracking_dir>/<id>/` (`id`: `[a-z0-9_-]{1,32}`), atomically (temporary file, then
 rename), folder `755` and files `644`:
 
-| File | Content |
-|---|---|
-| `relay.json` | `{"format": 1, "id", "name", "domains": [..], "capabilities": [..], "lag", "events_days", "headers"?: {..}}` |
+| File          | Content                                                                                                                                                                                      |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `relay.json`  | `{"format": 1, "id", "name", "domains": [..], "capabilities": [..], "lag", "events_days", "headers"?: {..}}`                                                                                 |
 | `events.json` | `{"generated", "days", "since"?, "messages": {"<Message-ID>": {"<recipient>": [[date, type, extra?, ip?], ...]}}, "hosts"?: {"<ip>": {"rdns", "provider", "country"?, "region"?, "city"?}}}` |
 
 - `capabilities`: `events` (required), `opens`, `clicks`.
@@ -245,19 +245,19 @@ rename), folder `755` and files `644`:
 
 ## Relays
 
-| Relay | Events read from | Correlation with the Message-ID | Opens / clicks | IP | Default window |
-|---|---|---|---|---|---|
-| **Brevo** | global feed | kept by Brevo | yes | yes | 90 d |
-| **Postmark** | search + details per message | `X-PM-Metadata-rt-mid` header | yes | first open, clicks | 45 d |
-| **Mailgun** | Logs API, since the last run | `X-Mailgun-Variables` header | yes | yes | 30 d (plan) |
-| **SendGrid** | Email Activity (paid add-on) | `X-SMTPAPI` unique argument | yes | no | 30 d |
-| **Mailjet** | messages + history per message | `X-MJ-CustomID` header | yes, no link | no | 30 d |
-| **Lettermint** | messages + events per message | `X-LM-Metadata-rt_mid` header | yes | no | 28 d |
-| **SMTP2GO** | activity search, since the last run | Message-ID from the stored headers | yes | yes | 30 d (plan) |
-| **Scaleway TEM** | state of each email | `message_id` (to check) | no | no | 30 d |
-| **MailerSend** | activity, since the last run | `250 queued as` id from the Postfix log | yes | no | 30 d (plan) |
-| **Amazon SES** | SNS > SQS queue, emptied each run | original headers in each event | yes | yes | 90 d (kept by the collector) |
-| **Resend** | latest event per email only | `message_id` (to check) | latest only | no | 30 d |
+| Relay            | Events read from                    | Correlation with the Message-ID         | Opens / clicks | IP                 | Default window               |
+| ---------------- | ----------------------------------- | --------------------------------------- | -------------- | ------------------ | ---------------------------- |
+| **Brevo**        | global feed                         | kept by Brevo                           | yes            | yes                | 90 d                         |
+| **Postmark**     | search + details per message        | `X-PM-Metadata-rt-mid` header           | yes            | first open, clicks | 45 d                         |
+| **Mailgun**      | Logs API, since the last run        | `X-Mailgun-Variables` header            | yes            | yes                | 30 d (plan)                  |
+| **SendGrid**     | Email Activity (paid add-on)        | `X-SMTPAPI` unique argument             | yes            | no                 | 30 d                         |
+| **Mailjet**      | messages + history per message      | `X-MJ-CustomID` header                  | yes, no link   | no                 | 30 d                         |
+| **Lettermint**   | messages + events per message       | `X-LM-Metadata-rt_mid` header           | yes            | no                 | 28 d                         |
+| **SMTP2GO**      | activity search, since the last run | Message-ID from the stored headers      | yes            | yes                | 30 d (plan)                  |
+| **Scaleway TEM** | state of each email                 | `message_id` (to check)                 | no             | no                 | 30 d                         |
+| **MailerSend**   | activity, since the last run        | `250 queued as` id from the Postfix log | yes            | no                 | 30 d (plan)                  |
+| **Amazon SES**   | SNS > SQS queue, emptied each run   | original headers in each event          | yes            | yes                | 90 d (kept by the collector) |
+| **Resend**       | latest event per email only         | `message_id` (to check)                 | latest only    | no                 | 30 d                         |
 
 The headers are added by the plugin when sending (from `headers` in `relay.json`), so only mail sent after the
 collector first ran is tracked on those relays. Each driver in [`collectors/relays/`](collectors/relays) starts with

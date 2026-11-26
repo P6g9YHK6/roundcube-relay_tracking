@@ -63,6 +63,8 @@ jobs:
         with:
           node-version: '20'
       - run: node --check relay_tracking.js && node --check tests/js/box_test.js
+      - name: prettier (JS, CSS, Markdown, YAML, JSON)
+        run: npx --yes prettier@3.3.3 --check .
       - run: npm install --no-save --no-audit --no-fund jsdom@24.1.3
       - name: Tracking box in jsdom
         run: node tests/js/box_test.js
