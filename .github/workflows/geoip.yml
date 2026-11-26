@@ -1,7 +1,7 @@
-# Keeps the geoip branch on DB-IP's latest "IP to City Lite" release (CC BY 4.0, https://db-ip.com).
-# Checks every day; only when DB-IP published a new file does it convert it (tools/dbip-convert.py) and replace the
-# branch with a single commit, so the repository does not grow month after month. Collectors with IP_GEO=1 read
-# VERSION from that branch and download ranges.tsv.xz + locations.tsv.xz when it changes.
+# Keeps the geoip branch on DB-IP's latest "IP to City Lite" and "IP to ASN Lite" releases (CC BY 4.0,
+# https://db-ip.com). Checks every day; only when DB-IP published a new month does it convert them
+# (tools/dbip-convert.py) and replace the branch with a single commit, so the repository does not grow month after
+# month. Collectors with IP_GEO=1 or IP_ASN=1 read VERSION from that branch and download the files when it changes.
 name: geoip
 
 on:
@@ -22,17 +22,19 @@ jobs:
         id: src
         run: |
           set -eu
-          # the month's file appears on the 1st; fall back to the previous month until it does
+          # the month's files appear on the 1st; fall back to the previous month until both do
           for m in "$(date -u +%Y-%m)" "$(date -u -d "$(date -u +%Y-%m-01) -1 day" +%Y-%m)"; do
-            url="https://download.db-ip.com/free/dbip-city-lite-$m.csv.gz"
-            mod=$(curl -sfI -m 30 "$url" | tr -d '\r' | sed -n 's/^last-modified: //Ip' || true)
-            if [ -n "$mod" ]; then
-              echo "url=$url" >> "$GITHUB_OUTPUT"
-              echo "version=$m $mod" >> "$GITHUB_OUTPUT"
+            city="https://download.db-ip.com/free/dbip-city-lite-$m.csv.gz"
+            asn="https://download.db-ip.com/free/dbip-asn-lite-$m.csv.gz"
+            mod=$(curl -sfI -m 30 "$city" | tr -d '\r' | sed -n 's/^last-modified: //Ip' || true)
+            if [ -n "$mod" ] && curl -sfI -m 30 "$asn" > /dev/null; then
+              echo "city=$city" >> "$GITHUB_OUTPUT"
+              echo "asn=$asn" >> "$GITHUB_OUTPUT"
+              echo "version=$m $mod asn" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           done
-          echo "::error::no DB-IP city lite file found"
+          echo "::error::no DB-IP lite files found"
           exit 1
 
       - name: Compare with the geoip branch
@@ -47,15 +49,18 @@ jobs:
         if: steps.cmp.outputs.new == '1'
         run: |
           set -eu
-          curl -sf -m 600 -o dbip.csv.gz "${{ steps.src.outputs.url }}"
-          python3 tools/dbip-convert.py dbip.csv.gz out
-          xz -9 -T0 out/ranges.tsv out/locations.tsv
+          curl -sf -m 600 -o city.csv.gz "${{ steps.src.outputs.city }}"
+          curl -sf -m 600 -o asn.csv.gz "${{ steps.src.outputs.asn }}"
+          python3 tools/dbip-convert.py city city.csv.gz out
+          python3 tools/dbip-convert.py asn asn.csv.gz out
+          xz -9 -T0 out/ranges.tsv out/locations.tsv out/asn-ranges.tsv out/asn-names.tsv
           echo "${{ steps.src.outputs.version }}" > out/VERSION
           cat > out/README.md <<'MD'
           # relay_tracking geoip data
 
-          IP to location data for the relay_tracking collectors (`IP_GEO=1`), rebuilt from
-          [DB-IP](https://db-ip.com)'s free "IP to City Lite" database by `tools/dbip-convert.py` on the main branch.
+          IP to location (`IP_GEO=1`) and IP to network owner (`IP_ASN=1`) data for the relay_tracking collectors,
+          rebuilt from [DB-IP](https://db-ip.com)'s free "IP to City Lite" and "IP to ASN Lite" databases by
+          `tools/dbip-convert.py` on the main branch.
 
           IP Geolocation by DB-IP, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
           Changes: coordinates and continent dropped, neighbouring ranges with the same location merged, range starts
@@ -66,6 +71,6 @@ jobs:
           git config user.name "P6g9YHK6"
           git config user.email "17877371+P6g9YHK6@users.noreply.github.com"
           git add -A
-          git commit -q -m "dbip city lite $(cut -d' ' -f1 VERSION)"
+          git commit -q -m "dbip city and asn lite $(cut -d' ' -f1 VERSION)"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" geoip
           ls -la

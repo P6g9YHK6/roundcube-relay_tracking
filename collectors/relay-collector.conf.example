@@ -23,16 +23,14 @@ STATE_DIR=/srv/relay-tracking/collector/state/brevo
 # provider's proxy): personal data, so off by default. Not every relay gives them.
 #INCLUDE_IP=0
 
-# Identify each IP (needs INCLUDE_IP=1 and dig): reverse DNS name, shown under the IP with its domain. Cached 30 days
-# in STATE_DIR, 200 new lookups per run at most.
+# Reverse DNS name of each IP (needs INCLUDE_IP=1 and dig), shown on hover of its owner. Cached 30 days in STATE_DIR,
+# 200 new lookups per run at most.
 #IP_LOOKUP=0
 
-# With IP_LOOKUP=1, also show each IP's network owner (e.g. Swisscom, Cloudflare), looked up at Team Cymru's public
-# DNS service: the IPs are then sent to that third party.
-#IP_ASN=0
-
-# Location of each IP (needs INCLUDE_IP=1 and xz): DB-IP Lite data from the plugin's geoip branch, downloaded when it
-# changes (about 18 MB, checked once a day) and searched locally, the IPs never leave this server.
+# Network owner (e.g. Swisscom, Cloudflare) and location of each IP (need INCLUDE_IP=1 and xz): DB-IP Lite data from
+# the plugin's geoip branch, downloaded when it changes (checked once a day; about 2.5 MB for the owners, 18 MB for
+# the locations) and searched locally, the IPs never leave this server.
+#IP_ASN=1
 #IP_GEO=0
 #GEO_URL=https://raw.githubusercontent.com/P6g9YHK6/roundcube-relay_tracking/geoip
 

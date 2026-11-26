@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.6.0 (2026-11-26)
+
+- Network owner of each IP from DB-IP's free "IP to ASN Lite" data, searched locally like the locations: the IPs no
+  longer go to Team Cymru, whose lookup is removed. On by default (`IP_ASN=1`, still needs `INCLUDE_IP=1`), no longer
+  tied to `IP_LOOKUP`, which now only adds the reverse DNS name. The geoip branch carries the owner files next to the
+  location ones; a collector downloads only the files of what it has turned on.
+- `tools/dbip-convert.py` takes the kind of file first: `city` or `asn`.
+- The DB-IP credit in the tracking box also shows when only owners are.
+
 ## 2.5.0 (2026-11-26)
 
 - Self tracking (`relay_tracking_self`, off by default): when sending, Roundcube adds an open pixel and sends the links

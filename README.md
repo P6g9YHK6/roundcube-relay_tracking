@@ -37,7 +37,7 @@ opens and clicks in its database.
 - Roundcube 1.6 or later with the Elastic skin (or a skin derived from it), PHP 7.3 or later.
 - Self tracking: the plugin's two tables in Roundcube's database (MySQL/MariaDB, PostgreSQL or SQLite).
 - Relays, on the server running the collector: bash 4+, curl (7.75+ for Amazon SES), jq 1.6+, flock, GNU date; `dig` for
-  reverse DNS, `xz` for locations.
+  reverse DNS, `xz` for owners and locations.
 - Relays: a relay API key allowed to read its events (what each relay needs is in the header of its driver).
 
 ## Installation
@@ -188,9 +188,9 @@ Set in the settings file (see [the example](collectors/relay-collector.conf.exam
 | `API_KEY_FILE` | required | file holding only the API key (`chmod 600`) |
 | `INCLUDE_IP` | `0` | `1` keeps the IP of each event |
 | `IP_LOOKUP` | `0` | `1` adds each IP's reverse DNS name (needs `INCLUDE_IP=1`, `dig`) |
-| `IP_ASN` | `0` | `1` adds the network owner, looked up at Team Cymru (sends the IPs to that third party) |
+| `IP_ASN` | `1` | network owner from DB-IP Lite data, searched locally (needs `INCLUDE_IP=1`, `xz`); `0` turns it off |
 | `IP_GEO` | `0` | `1` adds the location from DB-IP Lite data, searched locally (needs `INCLUDE_IP=1`, `xz`) |
-| `GEO_URL` | this repo's `geoip` branch | where the location data is downloaded from |
+| `GEO_URL` | this repo's `geoip` branch | where the owner and location data is downloaded from |
 | `EVENT_DAYS` | what the relay keeps | days of events kept |
 | `LAG` | the relay's | publication delay shown while a mail is pending |
 | `STATE_DIR` | `/var/lib/relay-tracking-<relay>` | lock, caches, accumulated events, location data; keep it on persistent storage |
@@ -207,19 +207,20 @@ want it. The plugin only does it itself with self tracking (`relay_tracking_self
 chose to track; it then keeps the date and type of each open and click, the clicked link, and the IP only with
 `relay_tracking_self_ip`, for `relay_tracking_self_days`. For relays, without `INCLUDE_IP` the data holds only dates,
 event types, clicked links and bounce reasons. IP addresses are the recipients' (or their provider's proxy): personal
-data, so only keep them with a basis for it. Locations are looked up locally and never send the IPs anywhere; `IP_ASN`
-sends them to Team Cymru, and the IP link sends one IP to iplocation.net when clicked. Self tracking looks nothing up:
-its IPs (with `relay_tracking_self_ip`) are shown without location or owner.
+data, so only keep them with a basis for it. Owners and locations are looked up locally and never send the IPs anywhere;
+reverse DNS (`IP_LOOKUP`) asks the DNS, and the IP link sends one IP to iplocation.net when clicked. Self tracking looks
+nothing up: its IPs (with `relay_tracking_self_ip`) are shown without location or owner.
 
-## IP locations
+## IP owners and locations
 
-The `geoip` branch holds [DB-IP](https://db-ip.com)'s free "IP to City Lite" database, converted by
-[`tools/dbip-convert.py`](tools/dbip-convert.py) to two xz files (about 18 MB). A
-[daily workflow](.github/workflows/geoip.yml) rebuilds the branch when DB-IP publishes a new month, as a single
-commit. Collectors with `IP_GEO=1` check its `VERSION` once a day and download the files only when it changed.
+The `geoip` branch holds [DB-IP](https://db-ip.com)'s free "IP to ASN Lite" and "IP to City Lite" databases, converted
+by [`tools/dbip-convert.py`](tools/dbip-convert.py) to xz files (about 2.5 MB for the owners, 18 MB for the locations).
+A [daily workflow](.github/workflows/geoip.yml) rebuilds the branch when DB-IP publishes a new month, as a single
+commit. Collectors with `IP_ASN=1` or `IP_GEO=1` check its `VERSION` once a day and download the files they need only
+when it changed; the IPs are searched in them locally.
 
 IP Geolocation by DB-IP, licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); the tracking box credits
-it wherever a location is shown.
+it wherever an owner or a location is shown.
 
 ## Data format (v1)
 

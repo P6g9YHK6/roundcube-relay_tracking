@@ -306,8 +306,8 @@
             if (data.self_only) {
                 body.appendChild(el('p', 'rt-note', label('self_note')));
             }
-            // DB-IP Lite data is CC BY 4.0: credit it wherever a location is shown
-            if (Object.keys(data.hosts || {}).some(function (ip) { return data.hosts[ip].location; })) {
+            // DB-IP Lite data is CC BY 4.0: credit it wherever a location or a network owner is shown
+            if (Object.keys(data.hosts || {}).some(function (ip) { return data.hosts[ip].location || data.hosts[ip].provider; })) {
                 var credit = el('p', 'rt-note rt-credit', label('geo_credit') + ' '), a = el('a', null, 'DB-IP');
                 a.href = 'https://db-ip.com';
                 a.target = '_blank';
