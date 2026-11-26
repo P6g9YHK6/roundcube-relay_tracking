@@ -3,7 +3,7 @@
 # converter, with every file the collectors download. Run daily after the geoip workflow; a failure means that workflow
 # did not run or failed.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 fail=0
 check(){ if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1 (expected '$2', got '$3')"; fail=$((fail + 1)); fi; }
 

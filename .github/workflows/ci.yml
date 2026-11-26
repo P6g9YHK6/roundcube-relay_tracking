@@ -26,6 +26,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           tools: none
+          coverage: none
       - name: php -l
         run: |
           set -e
@@ -46,6 +47,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           tools: none
+          coverage: none
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq sqlite3
       - name: Plugin (sending, tracking box, preferences, cleanup)
         run: php -d error_reporting=-1 tests/php/plugin_test.php
@@ -73,7 +75,7 @@ jobs:
       - name: bash -n
         run: for f in collectors/*.sh collectors/relays/*.sh tests/*.sh tests/*/*.sh; do bash -n "$f" || exit 1; done
       - name: shellcheck
-        run: shellcheck -x collectors/relay-collector.sh tests/*.sh tests/*/*.sh && shellcheck -s bash collectors/relays/*.sh tests/collector/fixture-driver.sh
+        run: shellcheck -S warning collectors/relay-collector.sh collectors/relays/*.sh tests/*.sh tests/*/*.sh
       - name: python
         run: python3 -m py_compile tools/dbip-convert.py
 

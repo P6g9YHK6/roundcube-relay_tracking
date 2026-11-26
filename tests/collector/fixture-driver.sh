@@ -1,3 +1,4 @@
+# shellcheck shell=bash disable=SC2034,SC2154
 # relay_tracking tests: relay driver reading its events from $FIXTURE_EVENTS (see the driver contract in
 # relay-collector.sh). Copied next to the real drivers by collector_test.sh, never installed.
 R_NAME="Fixture relay"

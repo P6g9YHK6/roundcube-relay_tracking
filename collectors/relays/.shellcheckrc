@@ -1,0 +1,3 @@
+# Drivers are sourced by relay-collector.sh: it reads their R_* settings and they use its variables and helpers.
+shell=bash
+disable=SC2034,SC2154

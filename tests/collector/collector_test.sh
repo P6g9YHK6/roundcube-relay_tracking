@@ -65,7 +65,7 @@ check 'lookups cached' '4 4' "$(wc -l < "$T/state/ipasn.tsv") $(wc -l < "$T/stat
 conf 'INCLUDE_IP=1' 'IP_ASN=0'
 rm -rf "$T/state/geo"
 run; check 'owners off' 'null' "$(jq -c '.hosts["1.0.0.7"]' "$E")"
-check 'nothing downloaded when off' 'false' "$( [ -d "$T/state/geo" ] && [ -n "$(ls "$T/state/geo" 2>/dev/null | grep xz)" ] && echo true || echo false)"
+check 'nothing downloaded when off' '' "$(find "$T/state" -name '*.xz')"
 
 conf 'INCLUDE_IP=1'
 DRY_RUN=1 bash "$C/relay-collector.sh" "$T/c.conf" > "$T/dry" 2>&1

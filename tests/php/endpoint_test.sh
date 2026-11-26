@@ -2,7 +2,7 @@
 # relay_tracking tests: the open pixel and tracked links over HTTP (PHP built-in server), as a recipient and as the
 # sender. Needs php, curl, sqlite3.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit 1
 T=$(mktemp -d); trap 'kill $SRV 2>/dev/null; rm -rf "$T"' EXIT
 export RT_DB="$T/rc.db"
 sqlite3 "$RT_DB" "CREATE TABLE users (user_id integer NOT NULL PRIMARY KEY); INSERT INTO users VALUES (1);" \

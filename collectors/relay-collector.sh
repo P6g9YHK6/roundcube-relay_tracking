@@ -105,6 +105,7 @@ cfg_line(){ printf '%s = %s\n' "$1" "$(cfgq "$2")" >> "$CFG"; }
 cfg_header(){ cfg_line header "$1"; }
 cfg_user(){ cfg_line user "$1"; }
 [ -s "$API_KEY_FILE" ] || { log "key not readable: $API_KEY_FILE"; exit 1; }
+# shellcheck disable=SC2034  # KEY, like the helpers below, is used by the drivers
 KEY=$(tr -d '\r\n ' < "$API_KEY_FILE")
 
 # api URL OUT [JSON body file]: GET (or POST with a body), prints the HTTP status; a 429 is retried once after the
@@ -132,6 +133,7 @@ uri(){ jq -rn --arg v "$1" '$v | @uri'; }
 iso(){ date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
 
 # jq helpers for the drivers: mid = Message-ID with angle brackets ("" when none)
+# shellcheck disable=SC2034  # used by the drivers
 JQ_DEFS='def mid: if . == null or . == "" then "" else (tostring | gsub("^\\s+|\\s+$"; "")
   | if startswith("<") then . else "<" + . + ">" end) end;'
 

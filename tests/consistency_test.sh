@@ -2,7 +2,7 @@
 # relay_tracking tests: things that drift apart silently. Same labels in every language, every label the code uses
 # exists, versions agree, every relay has a driver and a README row, no em dash anywhere.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 fail=0
 check(){ if [ -z "$2" ]; then echo "ok   $1"; else echo "FAIL $1"; printf '     %s\n' $2; fail=$((fail + 1)); fi; }
 keys(){ grep -oP "^\\\$labels\['\K\w+" "$1" | sort; }
