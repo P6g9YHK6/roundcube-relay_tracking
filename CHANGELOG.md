@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.6.1 (2026-11-26)
+
+- Lettermint: events without data (queued, processed) come with `metadata: []`, an empty list, which stopped the
+  driver on that message; the delivery response is plain text, not an object, and is now read as such.
+
 ## 2.6.0 (2026-11-26)
 
 - Network owner of each IP from DB-IP's free "IP to ASN Lite" data, searched locally like the locations: the IPs no

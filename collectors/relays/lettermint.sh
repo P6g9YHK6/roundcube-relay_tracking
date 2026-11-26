@@ -67,7 +67,7 @@ r_fetch(){
     : > "$WORK/lm.ev"
     lm_pages "/messages/$(uri "$id")/events?sort=timestamp&page%5Bsize%5D=100" "$WORK/lm.ev" || continue
     jq -c --arg mid "$mid" --argjson msg "$(jq -c --arg id "$id" 'select(.id == $id)' "$WORK/lm.ours" | head -n 1)" "$JQ_DEFS"'
-      (.metadata // {}) as $x
+      (.metadata | if type == "object" then . else {} end) as $x
       | {m: ($mid | mid), f: ($msg.from_email // ""), e: ($x.recipient // "*"), d: .timestamp,
          t: ({"processed": "sent", "delivered": "delivered", "soft_bounced": "soft_bounce", "hard_bounced": "hard_bounce",
               "spam_complaint": "spam", "failed": "error", "blocked": "blocked", "suppressed": "blocked",
@@ -77,7 +77,7 @@ r_fetch(){
                     then "proxy_open" else "opened" end)
                  else "other" end)),
          l: (if .event == "clicked" then ($x.url // $x.destination_url // $x.link // "") else "" end),
-         r: ($x.reason // $x.response.content // ""), i: ($x.ip // "")}' "$WORK/lm.ev" \
+         r: ($x.reason // (if ($x.response|type) == "object" then $x.response.content else $x.response end) // ""), i: ($x.ip // "")}' "$WORK/lm.ev" \
       | mc_put "$id" "$st"
   done < <(jq -r '[.id, ((.status // "") + " " + (.status_changed_at // "")), .created_at] | @tsv' "$WORK/lm.ours")
   mc_all >> "$EV"
