@@ -1,0 +1,135 @@
+# Lint and tests of the plugin, the collector, the converter and the SQL schemas (tests/), on every push and pull
+# request. Every day after the geoip workflow, also checks that the geoip branch is on DB-IP's latest release.
+name: ci
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '23 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  php-lint:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: none
+      - name: php -l
+        run: |
+          set -e
+          for f in relay_tracking.php config.inc.php.dist localization/*.inc tests/php/*.php; do
+            php -d error_reporting=-1 -l "$f"
+          done
+
+  php-tests:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: none
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq sqlite3
+      - name: Plugin (sending, tracking box, preferences, cleanup)
+        run: php -d error_reporting=-1 tests/php/plugin_test.php
+      - name: Open pixel and tracked links over HTTP
+        run: tests/php/endpoint_test.sh
+
+  js:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check relay_tracking.js && node --check tests/js/box_test.js
+      - run: npm install --no-save --no-audit --no-fund jsdom@24.1.3
+      - name: Tracking box in jsdom
+        run: node tests/js/box_test.js
+
+  shell-python:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash -n
+        run: for f in collectors/*.sh collectors/relays/*.sh tests/*.sh tests/*/*.sh; do bash -n "$f" || exit 1; done
+      - name: shellcheck
+        run: shellcheck -x collectors/relay-collector.sh tests/*.sh tests/*/*.sh && shellcheck -s bash collectors/relays/*.sh tests/collector/fixture-driver.sh
+      - name: python
+        run: python3 -m py_compile tools/dbip-convert.py
+
+  collector:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq jq xz-utils
+      - name: Converter and a full collector run
+        run: tests/collector/collector_test.sh
+
+  sql:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: rc
+        ports: ['3306:3306']
+        options: --health-cmd="mysqladmin ping -proot" --health-interval=5s --health-timeout=5s --health-retries=20
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: rc
+        ports: ['5432:5432']
+        options: --health-cmd=pg_isready --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq sqlite3
+      - run: tests/sql/schema_test.sh sqlite
+      - run: tests/sql/schema_test.sh mysql
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PWD: root
+      - run: tests/sql/schema_test.sh postgres
+        env:
+          PGHOST: 127.0.0.1
+          PGUSER: postgres
+          PGPASSWORD: root
+
+  consistency:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: tests/consistency_test.sh
+      - run: composer validate --no-check-publish --no-check-lock
+
+  geoip-fresh:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: geoip branch on DB-IP's latest release, built by the current converter
+        run: tests/geoip_fresh_test.sh

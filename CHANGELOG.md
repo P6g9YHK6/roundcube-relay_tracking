@@ -8,6 +8,13 @@
   location ones; a collector downloads only the files of what it has turned on.
 - `tools/dbip-convert.py` takes the kind of file first: `city` or `asn`.
 - The DB-IP credit in the tracking box also shows when only owners are.
+- Converter: the space after the last range of IPv4 and of IPv6 is marked unknown, so an IP there no longer takes the
+  last range's owner or location. The geoip branch version includes the converter's hash, and a change to the
+  converter rebuilds the branch on push.
+- CI (`.github/workflows/ci.yml`, tests in `tests/`): PHP lint on 7.3 to 8.4; the plugin run against Roundcube stubs
+  (sending, open pixel and links over HTTP, tracking box data, preferences); the box drawn in jsdom; shellcheck; a full
+  collector run on a fixture relay and fixture DB-IP files; the SQL schemas in SQLite, MySQL and PostgreSQL; labels,
+  versions and docs in step. Daily, the geoip branch is checked against DB-IP's latest release.
 
 ## 2.5.0 (2026-11-26)
 

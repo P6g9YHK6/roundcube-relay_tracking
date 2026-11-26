@@ -268,6 +268,13 @@ against sample answers built from it, not yet against real accounts: try one wit
 A new relay needs only a driver: the contract is at the top of
 [`relay-collector.sh`](collectors/relay-collector.sh).
 
+## Tests
+
+`tests/` holds what the CI runs on every push (see [`ci.yml`](.github/workflows/ci.yml)); each script runs on its
+own too, e.g. `tests/collector/collector_test.sh` or `php tests/php/plugin_test.php`. The plugin is tested against
+small stand-ins for Roundcube's classes with a real SQLite database, the collector with a fixture relay driver and
+fixture DB-IP files. A daily job checks that the geoip branch is on DB-IP's latest release.
+
 ## License
 
 GPL-3.0-or-later, like Roundcube (see [LICENSE](LICENSE)). Location data: DB-IP, CC BY 4.0.

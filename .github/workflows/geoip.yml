@@ -7,6 +7,10 @@ name: geoip
 on:
   schedule:
     - cron: '23 5 * * *'
+  # a new converter changes the files: rebuild without waiting for the next day
+  push:
+    branches: [main]
+    paths: [tools/dbip-convert.py, .github/workflows/geoip.yml]
   workflow_dispatch:
 
 permissions:
@@ -30,7 +34,8 @@ jobs:
             if [ -n "$mod" ] && curl -sfI -m 30 "$asn" > /dev/null; then
               echo "city=$city" >> "$GITHUB_OUTPUT"
               echo "asn=$asn" >> "$GITHUB_OUTPUT"
-              echo "version=$m $mod asn" >> "$GITHUB_OUTPUT"
+              # + the converter's hash: a change to the converter rebuilds the branch too
+              echo "version=$m $mod $(sha256sum tools/dbip-convert.py | cut -c1-8)" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           done

@@ -12,9 +12,9 @@ asn:  OUTDIR/asn-ranges.tsv  <key of the first address> TAB <AS number>, same la
       OUTDIR/asn-names.tsv   <AS number> TAB <organisation>; 0 = none
 
 key = "4" + 8 hex digits for IPv4, "6" + 32 hex digits for IPv6, so plain string comparison orders addresses (awk
-can search the file without any IP library). Only range starts are kept; a gap in the source gets a range of id 0 so
-it does not inherit the previous one; neighbouring ranges with the same id are merged; coordinates and continent are
-dropped.
+can search the file without any IP library). Only range starts are kept; a gap in the source, and the space after
+the last range of IPv4 and of IPv6, get a range of id 0 so they do not inherit the previous one; neighbouring ranges
+with the same id are merged; coordinates and continent are dropped.
 """
 import csv
 import gzip
@@ -34,14 +34,24 @@ def clean(text):
 def write_ranges(rows, path):
     """rows: (start, end, id) in address order"""
     last_id, last_end, last_version = None, None, None
+
+    def close(out):
+        # space after the last range of an address family: unknown, not the last range's id
+        if last_version is not None and last_end < (2 ** 32 if last_version == 4 else 2 ** 128) - 1:
+            out.write('%s\t0\n' % key(ipaddress.ip_address(last_end + 1)))
+
     with open(path, 'w') as out:
         for start, end, rid in rows:
-            contiguous = last_version == start.version and last_end is not None and int(start) == last_end + 1
+            if last_version is not None and start.version != last_version:
+                close(out)
+                last_id, last_end, last_version = None, None, None
+            contiguous = last_end is not None and int(start) == last_end + 1
             if not (contiguous and rid == last_id):
-                if last_version == start.version and not contiguous:
+                if last_end is not None and not contiguous:
                     out.write('%s\t0\n' % key(ipaddress.ip_address(last_end + 1)))
                 out.write('%s\t%d\n' % (key(start), rid))
             last_id, last_end, last_version = rid, int(end), start.version
+        close(out)
 
 
 def read(path, width):
