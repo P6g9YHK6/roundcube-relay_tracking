@@ -2,7 +2,8 @@
 
 Roundcube plugin for mail sent through a **transactional SMTP relay** (Brevo, Postmark, Mailgun, SendGrid, Mailjet,
 Lettermint, SMTP2GO, Scaleway TEM, MailerSend, Amazon SES, Resend): every sent mail shows, per recipient, whether it
-was delivered, opened, clicked, bounced, reported as spam or unsubscribed.
+was delivered, opened, clicked, bounced, reported as spam or unsubscribed. Without a relay, or next to one, Roundcube
+can also track opens and clicks itself ([self tracking](#self-tracking-optional)).
 
 ![Tracking box of a sent mail: stepper per recipient and the timeline of the first one, with IP location and owner](docs/screenshot-tracking.png)
 
@@ -16,24 +17,28 @@ was delivered, opened, clicked, bounced, reported as spam or unsubscribed.
 - **Timeline per recipient**: one row per event with time, event, detail (clicked link, bounce reason) and IP.
 - **Retries and automatic opens kept apart**: a deferral followed by a delivery is a retry, not a problem; opens by
   image proxies (Apple, Proton, ...) are marked as automatic, since only clicks prove a read.
-- **Self tracking** (optional): without a relay, or next to one, Roundcube itself adds an open pixel and sends the
-  links through its own address, and shows the opens and clicks in the same box. Chosen per mail in compose.
+- **Self tracking** (optional, off by default): without a relay, or next to one, Roundcube itself adds an open pixel
+  and sends the links through its own address, and shows the opens and clicks in the same box (Sent > Opened >
+  Clicked). Chosen per mail with a "Track opens and clicks" box in compose; the sender's own views are not counted.
 - **IP details** (optional): location (city, region, country), network owner or reverse DNS domain, and a link to an
   online lookup.
-- **User preferences** (Settings > Preferences > Displaying Messages > Delivery tracking): show IP addresses, who they
-  belong to, where they are.
+- **User preferences** (Settings > Preferences): show IP addresses, who they belong to, where they are (Displaying
+  Messages > Delivery tracking); track opens and clicks of new mails by default (Composing Messages > Delivery
+  tracking, with self tracking on).
 - Dates in the user's Roundcube date format and timezone; English and French; light and dark mode.
 
 **Roundcube holds no relay key.** A collector (a script on the server, with the key) reads the relay's API and writes
 JSON files to a folder Roundcube only reads. One relay = one subfolder = one settings file for the collector, which
-has a driver per relay (see [Relays](#relays)).
+has a driver per relay (see [Relays](#relays)). Self tracking needs no key and no collector: Roundcube stores its own
+opens and clicks in its database.
 
 ## Requirements
 
 - Roundcube 1.6 or later with the Elastic skin (or a skin derived from it), PHP 7.3 or later.
-- On the server running the collector: bash 4+, curl (7.75+ for Amazon SES), jq 1.6+, flock, GNU date; `dig` for
+- Self tracking: the plugin's two tables in Roundcube's database (MySQL/MariaDB, PostgreSQL or SQLite).
+- Relays, on the server running the collector: bash 4+, curl (7.75+ for Amazon SES), jq 1.6+, flock, GNU date; `dig` for
   reverse DNS, `xz` for locations.
-- A relay API key allowed to read its events (what each relay needs is in the header of its driver).
+- Relays: a relay API key allowed to read its events (what each relay needs is in the header of its driver).
 
 ## Installation
 
@@ -143,6 +148,11 @@ mail is sent as it is. All recipients get the same mail, so an open or a click c
 one row for all of them, without delivery information. Opening the mail from the sender's own Roundcube session is not
 counted.
 
+An open within 20 seconds of sending, or from a client that gives no detail about itself (Apple Mail Privacy
+Protection), is marked as automatic: the recipient's provider loading images on receipt, not a reader. A mail keeps at
+most 500 opens and clicks. Upgrading from 2.4 and earlier: nothing to do unless you turn self tracking on, the tables
+are only used then.
+
 ## Configuration
 
 ### Roundcube
@@ -194,10 +204,12 @@ or the collector refuses to start.
 
 Open and click tracking is done by the relay (tracking pixel, rewritten links); turn it off at the relay if you do not
 want it. The plugin only does it itself with self tracking (`relay_tracking_self`, off by default), on mail the sender
-chose to track; the IPs are then kept only with `relay_tracking_self_ip`. Without `INCLUDE_IP` the data holds only dates, event types, clicked links and bounce
-reasons. IP addresses are the recipients' (or their provider's proxy): personal data, so only keep them with a basis
-for it. Locations are looked up locally and never send the IPs anywhere; `IP_ASN` sends them to Team Cymru, and the
-IP link sends one IP to iplocation.net when clicked.
+chose to track; it then keeps the date and type of each open and click, the clicked link, and the IP only with
+`relay_tracking_self_ip`, for `relay_tracking_self_days`. For relays, without `INCLUDE_IP` the data holds only dates,
+event types, clicked links and bounce reasons. IP addresses are the recipients' (or their provider's proxy): personal
+data, so only keep them with a basis for it. Locations are looked up locally and never send the IPs anywhere; `IP_ASN`
+sends them to Team Cymru, and the IP link sends one IP to iplocation.net when clicked. Self tracking looks nothing up:
+its IPs (with `relay_tracking_self_ip`) are shown without location or owner.
 
 ## IP locations
 
