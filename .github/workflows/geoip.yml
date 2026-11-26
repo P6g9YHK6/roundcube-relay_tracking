@@ -45,7 +45,8 @@ jobs:
       - name: Compare with the geoip branch
         id: cmp
         run: |
-          current=$(git fetch -q origin geoip 2>/dev/null && git show origin/geoip:VERSION 2>/dev/null || true)
+          current=""
+          if git fetch -q origin geoip 2>/dev/null; then current=$(git show origin/geoip:VERSION 2>/dev/null || true); fi
           echo "current: ${current:-none}"
           echo "latest:  ${{ steps.src.outputs.version }}"
           if [ "$current" = "${{ steps.src.outputs.version }}" ]; then echo "new=0"; else echo "new=1"; fi >> "$GITHUB_OUTPUT"
