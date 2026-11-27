@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.7.1 (2026-11-27)
+
+- Lettermint: the metadata cache `lm.meta` was never saved when the last listed message was not ours, so every message
+  of the window was read again from the API each run.
+- The reverse DNS cache had the same flaw when the last IP in it was older than 90 days.
+
 ## 2.7.0 (2026-11-26)
 
 - Events are kept after the relay drops them (Brevo: 90 days, most others 30). Every relay now keeps its events

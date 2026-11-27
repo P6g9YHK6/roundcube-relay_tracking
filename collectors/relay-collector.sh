@@ -344,7 +344,7 @@ if [ "$EV_OK" = "1" ] && [ "$INCLUDE_IP" = "1" ] && { [ "$IP_LOOKUP" = "1" ] || 
     done < "$WORK/ips"
     # entries not seen for 90 days are dropped
     for ip in "${!INFO[@]}"; do
-      [ $(( NOW - ${INFO[$ip]%%$'\t'*} )) -lt 7776000 ] && printf '%s\t%s\n' "$ip" "${INFO[$ip]}"
+      [ $(( NOW - ${INFO[$ip]%%$'\t'*} )) -lt 7776000 ] && printf '%s\t%s\n' "$ip" "${INFO[$ip]}" || :
     done > "$CACHE.tmp" && mv -f "$CACHE.tmp" "$CACHE"
   fi
 

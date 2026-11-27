@@ -56,7 +56,7 @@ r_fetch(){
     MID[$id]=$(jq -r '.metadata.rt_mid // .data.metadata.rt_mid // ""' "$WORK/lm.d" | tr -d '\t\r\n')
   done < <(jq -r '.id' "$WORK/lm.ours")
   # only this window's messages are remembered
-  while read -r id; do [ -n "${MID[$id]+x}" ] && printf '%s\t%s\n' "$id" "${MID[$id]}"; done \
+  while read -r id; do [ -n "${MID[$id]+x}" ] && printf '%s\t%s\n' "$id" "${MID[$id]}" || :; done \
     < <(jq -r '.id' "$WORK/lm.list") > "$meta.tmp" && mv -f "$meta.tmp" "$meta"
 
   while IFS=$'\t' read -r id st at; do
